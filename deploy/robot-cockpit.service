@@ -1,0 +1,49 @@
+[Unit]
+Description=Robot Cockpit Server - 机器人驾驶舱服务
+Documentation=https://github.com/your-org/robot-cockpit
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=robot
+Group=robot
+WorkingDirectory=/opt/robot-cockpit
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="DISPLAY_MODE=single"
+# 如果Chrome在非标准位置，设置路径
+Environment="PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome"
+# 或者使用自动检测
+# Environment="PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true"
+
+ExecStart=/usr/bin/node backend/server.js
+
+# 自动重启配置
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=60s
+
+# 日志配置
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=robot-cockpit
+
+# 资源限制
+LimitNOFILE=65535
+MemoryLimit=2G
+CPUQuota=200%
+
+# 安全配置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/robot-cockpit
+ReadWritePaths=/tmp
+ReadWritePaths=/var/log/robot-cockpit
+
+[Install]
+WantedBy=multi-user.target
+

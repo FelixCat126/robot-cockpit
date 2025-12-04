@@ -1,0 +1,287 @@
+/**
+ * CompactStyles.css
+ * 紧凑模式的通用样式，用于单屏Grid布局
+ */
+
+/* ========== ControlPanel 紧凑样式 ========== */
+.control-panel.compact {
+  padding: 10px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.control-panel.compact .control-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-panel.compact .command-category {
+  margin-bottom: 8px;
+}
+
+.control-panel.compact .category-title {
+  display: none; /* 紧凑模式隐藏分类标题 */
+}
+
+.control-panel.compact .command-grid {
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 6px;
+}
+
+.control-panel.compact .command-button {
+  min-width: 60px;
+  min-height: 60px;
+  padding: 6px;
+  border-width: 1px;
+}
+
+.control-panel.compact .command-icon {
+  margin-bottom: 2px;
+}
+
+.control-panel.compact .command-label {
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.control-panel.compact .command-feedback {
+  display: none; /* 紧凑模式隐藏反馈信息 */
+}
+
+.control-panel.compact .warning-message {
+  padding: 6px;
+  font-size: 11px;
+}
+
+.control-panel.compact .warning-icon {
+  font-size: 16px;
+}
+
+/* ========== VideoPlayer 紧凑样式 ========== */
+.video-player.compact {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.video-player.compact .video-container {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.video-player.compact .video-stream {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video-player.compact .camera-info-panel {
+  display: none; /* 紧凑模式隐藏相机信息面板 */
+}
+
+.video-player.compact .video-controls {
+  padding: 6px;
+  background: rgba(15, 23, 42, 0.9);
+  border-top: 1px solid #334155;
+}
+
+.video-player.compact .control-btn {
+  padding: 6px 10px;
+  font-size: 16px;
+}
+
+.video-player.compact .video-overlay {
+  padding: 8px;
+}
+
+.video-player.compact .overlay-info {
+  gap: 8px;
+}
+
+.video-player.compact .live-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.video-player.compact .timestamp {
+  font-size: 11px;
+}
+
+/* ========== AudioPlayer 紧凑样式 ========== */
+.audio-player.compact {
+  padding: 8px 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.audio-player.compact .audio-header {
+  margin-bottom: 8px;
+}
+
+.audio-player.compact .audio-header h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.audio-player.compact .streaming-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.audio-player.compact .control-btn {
+  padding: 4px 8px;
+  font-size: 16px;
+}
+
+.audio-player.compact .audio-visualizer {
+  flex: 1;
+  min-height: 0;
+}
+
+.audio-player.compact .audio-bars {
+  height: 60px;
+}
+
+.audio-player.compact .audio-bar {
+  width: 4px;
+  min-width: 2px;
+}
+
+.audio-player.compact .audio-info {
+  display: none; /* 紧凑模式隐藏详细音频指标 */
+}
+
+/* ========== StatusMonitor 紧凑样式 ========== */
+.status-monitor.compact {
+  padding: 10px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.status-monitor.compact .status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.status-monitor.compact .status-card {
+  padding: 8px;
+  margin-bottom: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid #334155;
+  border-radius: 6px;
+}
+
+.status-monitor.compact .status-card h2 {
+  font-size: 13px;
+  margin: 0 0 8px 0;
+  color: #10b981;
+}
+
+.status-monitor.compact .basic-info-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-monitor.compact .info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(51, 65, 85, 0.3);
+  border-radius: 4px;
+}
+
+.status-monitor.compact .info-item .icon {
+  font-size: 16px;
+}
+
+.status-monitor.compact .info-item .value {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e2e8f0;
+}
+
+.status-monitor.compact .sensors-compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.status-monitor.compact .sensor-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: rgba(51, 65, 85, 0.3);
+  border-radius: 4px;
+  cursor: help;
+  transition: all 0.2s;
+}
+
+.status-monitor.compact .sensor-icon:hover {
+  background: rgba(51, 65, 85, 0.5);
+  transform: scale(1.05);
+}
+
+.status-monitor.compact .sensor-icon span {
+  font-size: 20px;
+}
+
+/* 隐藏非紧凑模式的元素 */
+.status-monitor.compact .metrics-grid,
+.status-monitor.compact .logs-card {
+  display: none;
+}
+
+/* ========== 滚动条样式（紧凑模式） ========== */
+.compact::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.compact::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.2);
+  border-radius: 2px;
+}
+
+.compact::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 2px;
+}
+
+.compact::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* ========== 通用紧凑样式调整 ========== */
+.compact * {
+  font-size: inherit;
+}
+
+.compact h1 {
+  font-size: 18px;
+}
+
+.compact h2 {
+  font-size: 14px;
+}
+
+.compact h3 {
+  font-size: 13px;
+}
+
+.compact p {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.compact button {
+  font-size: 12px;
+}
+

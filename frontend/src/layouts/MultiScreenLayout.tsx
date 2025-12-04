@@ -1,0 +1,174 @@
+/**
+ * MultiScreenLayout - 多屏模式布局
+ * 从App.tsx迁移的现有多屏逻辑
+ */
+
+import { useEffect, useState, useRef } from 'react';
+import { getScreenIdFromUrl } from '../utils/screenId';
+import { useAuthStore } from '../stores/authStore';
+import websocketService from '../services/websocket';
+import remoteLogger from '../utils/remoteLogger';
+import LoginPage from '../components/LoginPage';
+import RobotList from '../components/RobotList';
+import Screen0 from '../screens/Screen0';
+import Screen1 from '../screens/Screen1';
+import Screen2 from '../screens/Screen2';
+
+const TOUCH_SCREEN_ID = parseInt(import.meta.env.VITE_TOUCH_SCREEN_ID || '0', 10);
+
+export const MultiScreenLayout: React.FC = () => {
+  const [screenId, setScreenId] = useState<number | null>(null);
+  const [selectedRobotId, setSelectedRobotId] = useState<string | null>(() => {
+    const saved = localStorage.getItem('robot_cockpit_selected_robot');
+    return saved || null;
+  });
+  const { isAuthenticated, checkAuth } = useAuthStore();
+  const checkAuthRef = useRef(checkAuth);
+  
+  checkAuthRef.current = checkAuth;
+
+  useEffect(() => {
+    const id = getScreenIdFromUrl();
+    setScreenId(id);
+    
+    if (id !== null) {
+      remoteLogger.setScreenId(id);
+    }
+
+    checkAuthRef.current();
+  }, []);
+
+  useEffect(() => {
+    websocketService.connect();
+    
+    const handleConnected = () => {
+      if (screenId !== null) {
+        websocketService.registerScreen(screenId);
+      }
+    };
+    
+    websocketService.on('connected', handleConnected);
+    
+    if (websocketService.getStatus().connected && screenId !== null) {
+      websocketService.registerScreen(screenId);
+    }
+    
+    const handleAuthStatusChange = (data: { isAuthenticated: boolean; username?: string; timestamp: number }) => {
+      if (data.isAuthenticated) {
+        localStorage.setItem('robot_cockpit_logged_in', 'true');
+        localStorage.setItem('robot_cockpit_auth_updated', Date.now().toString());
+      } else {
+        localStorage.removeItem('robot_cockpit_logged_in');
+        localStorage.removeItem('robot_cockpit_token');
+        localStorage.setItem('robot_cockpit_auth_updated', Date.now().toString());
+      }
+      
+      checkAuthRef.current();
+    };
+    
+    websocketService.on('auth_status_change', handleAuthStatusChange);
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'robot_cockpit_logged_in' || e.key === 'robot_cockpit_auth_updated') {
+        checkAuthRef.current();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    const handleRobotSelected = (data: { robotId: string; timestamp: number }) => {
+      setSelectedRobotId(() => data.robotId);
+      localStorage.setItem('robot_cockpit_selected_robot', data.robotId);
+      localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
+    };
+
+    const handleUserLoggedOut = () => {
+      setSelectedRobotId(null);
+      localStorage.removeItem('robot_cockpit_selected_robot');
+      localStorage.removeItem('robot_cockpit_robot_updated');
+      localStorage.removeItem('robot_cockpit_logged_in');
+      localStorage.removeItem('robot_cockpit_token');
+      localStorage.setItem('robot_cockpit_auth_updated', Date.now().toString());
+      
+      checkAuthRef.current();
+    };
+
+    const handleRobotDeselected = () => {
+      setSelectedRobotId(null);
+      localStorage.removeItem('robot_cockpit_selected_robot');
+      localStorage.removeItem('robot_cockpit_robot_updated');
+    };
+
+    websocketService.on('robot_selected', handleRobotSelected);
+    websocketService.on('user_logged_out', handleUserLoggedOut);
+    websocketService.on('robot_deselected', handleRobotDeselected);
+
+    return () => {
+      websocketService.off('connected', handleConnected);
+      websocketService.off('auth_status_change', handleAuthStatusChange);
+      window.removeEventListener('storage', handleStorageChange);
+      websocketService.off('robot_selected', handleRobotSelected);
+      websocketService.off('user_logged_out', handleUserLoggedOut);
+      websocketService.off('robot_deselected', handleRobotDeselected);
+    };
+  }, [screenId]);
+
+  const handleSelectRobot = (robotId: string) => {
+    setSelectedRobotId(robotId);
+    localStorage.setItem('robot_cockpit_selected_robot', robotId);
+    localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
+    websocketService.selectRobot(robotId);
+  };
+
+  const handleDeselectRobot = () => {
+    setSelectedRobotId(null);
+    localStorage.removeItem('robot_cockpit_selected_robot');
+    localStorage.removeItem('robot_cockpit_robot_updated');
+    websocketService.deselectRobot();
+  };
+
+  const renderScreen = () => {
+    if (screenId === null) {
+      return <div className="error-screen">未指定屏幕ID，请在URL中添加 ?screen=0-2</div>;
+    }
+
+    if (screenId < 0 || screenId > 2) {
+      return <div className="error-screen">无效的屏幕ID: {screenId}，有效范围: 0-2</div>;
+    }
+
+    if (!isAuthenticated) {
+      const isInputEnabled = screenId === TOUCH_SCREEN_ID;
+      return <LoginPage screenId={screenId} isInputEnabled={isInputEnabled} />;
+    }
+
+    if (!selectedRobotId) {
+      if (screenId === TOUCH_SCREEN_ID) {
+        return <RobotList onSelectRobot={handleSelectRobot} />;
+      } else {
+        return (
+          <div className="waiting-screen">
+            <div className="waiting-content">
+              <h2>等待选择机器人</h2>
+              <p>请在操作屏选择要监控的机器人</p>
+              <div className="spinner"></div>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    switch (screenId) {
+      case 0:
+        return <Screen0 screenId={screenId} onDeselectRobot={handleDeselectRobot} />;
+      case 1:
+        return <Screen1 screenId={screenId} />;
+      case 2:
+        return <Screen2 screenId={screenId} />;
+      default:
+        return <div className="error-screen">无效的屏幕ID: {screenId}</div>;
+    }
+  };
+
+  return <div className="app multi-screen-layout">{renderScreen()}</div>;
+};
+
