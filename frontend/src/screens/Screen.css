@@ -1432,3 +1432,17 @@
     transform: translateY(0);
   }
 }
+
+/* 3D机器人内容区域 */
+.robot-3d-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  padding: 20px;
+}
+
+.robot-3d-content canvas {
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}

@@ -263,7 +263,8 @@ class ScreenManager extends EventEmitter {
       
       // 授予媒体权限（通过CDP，不使用命令行参数）
       const context = browser.defaultBrowserContext();
-      await context.overridePermissions('http://localhost:5173', [
+      const urlOrigin = new URL(url).origin;  // 动态获取URL的origin
+      await context.overridePermissions(urlOrigin, [
         'camera',
         'microphone',
         'notifications',
@@ -411,7 +412,7 @@ class ScreenManager extends EventEmitter {
 
       // 如果找到了系统Chrome，使用它
       if (executablePath) {
-        launchOptions.executablePath = executablePath;
+            launchOptions.executablePath = executablePath;
       }
 
       const browser = await puppeteer.launch(launchOptions);

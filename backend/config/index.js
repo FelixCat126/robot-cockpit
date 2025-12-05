@@ -57,7 +57,7 @@ const config = {
     
     // 多屏模式配置
     multi: {
-      count: parseInt(process.env.SCREEN_COUNT || '3', 10),
+      count: parseInt(process.env.SCREEN_COUNT || '4', 10),
       // 单显示器模式（用于测试）
       singleDisplayMode: process.env.SINGLE_DISPLAY_MODE === 'true' || true,
       // 单显示器模式下的窗口配置
@@ -72,7 +72,7 @@ const config = {
   // 屏幕管理配置（兼容旧代码）
   screen: {
     // 屏幕数量
-    count: parseInt(process.env.SCREEN_COUNT || '3', 10),
+    count: parseInt(process.env.SCREEN_COUNT || '4', 10),
     // 单显示器模式
     singleDisplayMode: process.env.SINGLE_DISPLAY_MODE === 'true' || true,
     // 单显示器模式下的窗口配置
@@ -95,7 +95,7 @@ const config = {
       ],
     },
     // 前端应用URL
-    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
     // 屏幕检测命令
     detectCommand: 'xrandr --listmonitors',
   },

@@ -13,6 +13,7 @@ import RobotList from '../components/RobotList';
 import Screen0 from '../screens/Screen0';
 import Screen1 from '../screens/Screen1';
 import Screen2 from '../screens/Screen2';
+import Screen3 from '../screens/Screen3';
 
 const TOUCH_SCREEN_ID = parseInt(import.meta.env.VITE_TOUCH_SCREEN_ID || '0', 10);
 
@@ -129,11 +130,11 @@ export const MultiScreenLayout: React.FC = () => {
 
   const renderScreen = () => {
     if (screenId === null) {
-      return <div className="error-screen">未指定屏幕ID，请在URL中添加 ?screen=0-2</div>;
+      return <div className="error-screen">未指定屏幕ID，请在URL中添加 ?screen=0-3</div>;
     }
 
-    if (screenId < 0 || screenId > 2) {
-      return <div className="error-screen">无效的屏幕ID: {screenId}，有效范围: 0-2</div>;
+    if (screenId < 0 || screenId > 3) {
+      return <div className="error-screen">无效的屏幕ID: {screenId}，有效范围: 0-3</div>;
     }
 
     if (!isAuthenticated) {
@@ -164,6 +165,8 @@ export const MultiScreenLayout: React.FC = () => {
         return <Screen1 screenId={screenId} />;
       case 2:
         return <Screen2 screenId={screenId} />;
+      case 3:
+        return <Screen3 screenId={screenId} />;
       default:
         return <div className="error-screen">无效的屏幕ID: {screenId}</div>;
     }

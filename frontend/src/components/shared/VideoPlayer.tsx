@@ -3,7 +3,7 @@
  * 支持真实摄像头和模拟视频
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import './CompactStyles.css';
 
 interface VideoPlayerProps {
@@ -87,11 +87,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       
       return true;
     } catch (error) {
-      console.error('[VideoPlayer] Failed to initialize real camera:', error);
+      console.error('[VideoPlayer] 摄像头初始化失败:', error);
       setVideoError('无法访问摄像头');
       return false;
     }
   }, []);
+
+  // 使用ref存储isPaused，避免drawSimulatedVideo重新创建
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   // 绘制模拟视频
   const drawSimulatedVideo = useCallback((
@@ -103,7 +109,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     let hue = 0;
 
     const draw = () => {
-      if (isPaused) {
+      if (isPausedRef.current) {
         animationRef.current = requestAnimationFrame(draw);
         return;
       }
@@ -156,15 +162,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
 
     draw();
-  }, [isPaused]);
+  }, []); // 移除isPaused依赖，使用ref代替
 
   // 初始化模拟视频
   const initSimulatedVideo = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return false;
+    if (!canvas) {
+      console.error('[VideoPlayer] 模拟视频初始化失败: canvasRef为null');
+      return false;
+    }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return false;
+    if (!ctx) {
+      console.error('[VideoPlayer] 模拟视频初始化失败: 无法获取2D context');
+      return false;
+    }
 
     canvas.width = 1920;
     canvas.height = 1080;
@@ -175,7 +187,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
       videoRef.current.play().catch(e => {
-        console.error('[VideoPlayer] Failed to play simulated video:', e);
+        console.error('[VideoPlayer] 模拟视频播放失败:', e);
       });
     }
 
@@ -209,8 +221,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [cleanupResources, initRealCamera, initSimulatedVideo]);
 
-  // 组件挂载时初始化
-  useEffect(() => {
+  // 组件挂载时初始化 - 使用 useLayoutEffect 确保 refs 已绑定
+  useLayoutEffect(() => {
     initializeVideo();
     
     return () => {
@@ -269,41 +281,79 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   return (
     <div className={`video-player ${compact ? 'compact' : ''} ${className}`}>
-      <div className="video-container">
-        {isVideoLoading ? (
-          <div className="video-placeholder">
-            <div className="placeholder-icon loading">📹</div>
-            <p className="placeholder-title">正在初始化视频流...</p>
-          </div>
-        ) : videoError ? (
-          <div className="video-placeholder error">
-            <div className="placeholder-icon">❌</div>
-            <p className="placeholder-title">{videoError}</p>
-            <button className="retry-btn" onClick={initializeVideo}>
-              🔄 重试
-            </button>
-          </div>
-        ) : (
-          <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="video-stream"
-            />
-            <canvas 
-              ref={canvasRef} 
-              style={{ display: 'none' }}
-            />
-            
-            <div className="video-overlay">
-              <div className="overlay-info">
-                <span className="live-badge">🔴 LIVE</span>
-                <span className="timestamp">{new Date().toLocaleTimeString()}</span>
-              </div>
+      <div className="video-container" style={{ position: 'relative' }}>
+        {/* 视频和Canvas元素 - 始终渲染 */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="video-stream"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            display: isVideoLoading || videoError ? 'none' : 'block'
+          }}
+        />
+        <canvas 
+          ref={canvasRef} 
+          style={{ display: 'none' }}
+        />
+        
+        {/* 视频叠加层 - 仅在正常播放时显示 */}
+        {!isVideoLoading && !videoError && (
+          <div className="video-overlay">
+            <div className="overlay-info">
+              <span className="live-badge">🔴 LIVE</span>
+              <span className="timestamp">{new Date().toLocaleTimeString()}</span>
             </div>
-          </>
+          </div>
+        )}
+        
+        {/* 加载状态覆盖层 */}
+        {isVideoLoading && (
+          <div className="video-placeholder" style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#0f172a',
+            zIndex: 10
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="placeholder-icon loading">📹</div>
+              <p className="placeholder-title">正在初始化视频流...</p>
+            </div>
+          </div>
+        )}
+        
+        {/* 错误状态覆盖层 */}
+        {videoError && (
+          <div className="video-placeholder error" style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#0f172a',
+            zIndex: 10
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="placeholder-icon">❌</div>
+              <p className="placeholder-title">{videoError}</p>
+              <button className="retry-btn" onClick={initializeVideo}>
+                🔄 重试
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

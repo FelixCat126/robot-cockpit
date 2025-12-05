@@ -13,6 +13,7 @@ import { ControlPanel } from '../components/shared/ControlPanel';
 import { VideoPlayer } from '../components/shared/VideoPlayer';
 import { AudioPlayer } from '../components/shared/AudioPlayer';
 import { StatusMonitor } from '../components/shared/StatusMonitor';
+import { Robot3DViewer } from '../components/shared/Robot3DViewer';
 import './SingleScreenLayout.css';
 
 export const SingleScreenLayout: React.FC = () => {
@@ -166,6 +167,18 @@ export const SingleScreenLayout: React.FC = () => {
         {/* 中间大区域：视频流 */}
         <section className="grid-video">
           <VideoPlayer compact={true} screenId={0} showControls={true} />
+          
+          {/* 3D机器人小窗口 */}
+          <div className="robot-3d-overlay">
+            <Robot3DViewer 
+              width={320}
+              height={180}
+              enableAutoRotate={true}
+              showGrid={false}
+              showAxes={false}
+              backgroundColor="#1a1a2e"
+            />
+          </div>
           
           {/* 预留第三视角位置（PIP） */}
           {showPIP && (
