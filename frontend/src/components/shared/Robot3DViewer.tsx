@@ -5,8 +5,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { RealisticHumanoidGenerator } from '../../utils/RealisticHumanoidGenerator';
-import { WalkingAnimation } from '../../utils/WalkingAnimation';
+import { GLTFRobotLoader } from '../../utils/GLTFRobotLoader';
 import { useRobot3DStore } from '../../stores/robot3DStore';
 
 export interface Robot3DViewerProps {
@@ -33,8 +32,11 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   const sceneRef = useRef<THREE.Scene>();
   const rendererRef = useRef<THREE.WebGLRenderer>();
   const cameraRef = useRef<THREE.PerspectiveCamera>();
-  const animationRef = useRef<WalkingAnimation>();
+  const mixerRef = useRef<THREE.AnimationMixer>();
   const animationIdRef = useRef<number>();
+  const robotGroupRef = useRef<THREE.Group>();
+  const currentActionRef = useRef<THREE.AnimationAction>();
+  const animationsRef = useRef<THREE.AnimationClip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -125,27 +127,52 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         scene.add(axesHelper);
       }
 
-      // 创建人形机器人（使用更真实的生成器）
-      const robotGenerator = new RealisticHumanoidGenerator(0.8);
-      const robot = robotGenerator.generate();
-      scene.add(robot.group);
-
-      // 创建走路动画
-      const walkAnimation = new WalkingAnimation(robot, {
-        walkSpeed: 1.0,
-        stepHeight: 0.2,
-        armSwing: 0.6,
-        bodyBob: 0.05,
+      // 加载GLTF机器人模型
+      console.log('[Robot3DViewer] 开始加载GLTF模型...');
+      const loader = new GLTFRobotLoader();
+      
+      loader.load().then((robotModel) => {
+      
+      scene.add(robotModel.scene);
+      robotGroupRef.current = robotModel.scene;
+      mixerRef.current = robotModel.mixer;
+      animationsRef.current = robotModel.animations;
+      
+      console.log('[Robot3DViewer] 模型加载完成');
+      console.log('[Robot3DViewer] 可用动画:', loader.getAnimationNames(robotModel.animations));
+      
+      // 默认播放Walking动画（如果有）
+      const walkingAnimation = loader.playAnimation(
+        robotModel.mixer,
+        robotModel.animations,
+        'Walking',
+        true
+      );
+      
+      if (walkingAnimation) {
+        currentActionRef.current = walkingAnimation;
+      }
+      
+      setIsLoading(false);
+      }).catch((error) => {
+        console.error('[Robot3DViewer] 模型加载失败:', error);
+        setError('无法加载机器人模型，请检查网络连接');
+        setIsLoading(false);
       });
-      animationRef.current = walkAnimation;
-      walkAnimation.start();
 
       // 相机自动旋转
       let cameraAngle = 0;
+      const clock = new THREE.Clock();
 
       // 动画循环
       const animate = () => {
         animationIdRef.current = requestAnimationFrame(animate);
+
+        // 更新动画混合器
+        const delta = clock.getDelta();
+        if (mixerRef.current) {
+          mixerRef.current.update(delta);
+        }
 
         // 相机旋转
         if (enableAutoRotate) {
@@ -166,8 +193,8 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         if (animationIdRef.current) {
           cancelAnimationFrame(animationIdRef.current);
         }
-        if (animationRef.current) {
-          animationRef.current.stop();
+        if (mixerRef.current) {
+          mixerRef.current.stopAllAction();
         }
         if (mountRef.current && renderer.domElement) {
           mountRef.current.removeChild(renderer.domElement);
@@ -201,73 +228,109 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   
   // 监听控制指令并执行动作
   useEffect(() => {
-    if (!currentCommand || !animationRef.current) return;
+    if (!currentCommand || !mixerRef.current || !animationsRef.current.length) return;
     
     console.log('[Robot3DViewer] 收到控制指令:', currentCommand);
-    const animation = animationRef.current;
+    const loader = new GLTFRobotLoader();
+    
+    // 停止当前动作
+    if (currentActionRef.current) {
+      currentActionRef.current.stop();
+    }
     
     switch (currentCommand) {
       case 'forward':
       case 'start':
       case 'resume':
-        animation.setSpeed(1.5);
-        animation.start();
-        console.log('[Robot3DViewer] 前进/启动');
+        // 播放跑步动画
+        const runAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Running', true);
+        if (runAction) {
+          runAction.timeScale = 1.2; // 加速
+          currentActionRef.current = runAction;
+        }
+        console.log('[Robot3DViewer] 前进/跑步');
         break;
         
       case 'backward':
-        animation.setSpeed(1.0);
-        animation.start();
+        // 播放走路动画（反向）
+        const walkBackAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Walking', true);
+        if (walkBackAction) {
+          walkBackAction.timeScale = -0.8; // 反向慢速
+          currentActionRef.current = walkBackAction;
+        }
         console.log('[Robot3DViewer] 后退');
         break;
         
       case 'left':
-        // 左转：增加Y轴旋转
-        if (sceneRef.current) {
-          const robot = sceneRef.current.children.find(child => child instanceof THREE.Group);
-          if (robot) {
-            robot.rotation.y += Math.PI / 4;
-            console.log('[Robot3DViewer] 左转45度');
-          }
+        // 左转：旋转机器人
+        if (robotGroupRef.current) {
+          robotGroupRef.current.rotation.y += Math.PI / 4;
+          console.log('[Robot3DViewer] 左转45度');
         }
         break;
         
       case 'right':
-        // 右转：减少Y轴旋转
-        if (sceneRef.current) {
-          const robot = sceneRef.current.children.find(child => child instanceof THREE.Group);
-          if (robot) {
-            robot.rotation.y -= Math.PI / 4;
-            console.log('[Robot3DViewer] 右转45度');
-          }
+        // 右转：旋转机器人
+        if (robotGroupRef.current) {
+          robotGroupRef.current.rotation.y -= Math.PI / 4;
+          console.log('[Robot3DViewer] 右转45度');
         }
         break;
         
       case 'stop':
       case 'pause':
       case 'emergency_stop':
-        animation.stop();
-        console.log('[Robot3DViewer] 停止');
+        // 播放空闲动画
+        const idleAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Idle', true);
+        if (idleAction) {
+          currentActionRef.current = idleAction;
+        }
+        console.log('[Robot3DViewer] 停止/待机');
         break;
         
       case 'patrol':
       case 'clean':
       case 'transport':
-        // 任务模式：中速行走
-        animation.setSpeed(1.2);
-        animation.start();
-        console.log('[Robot3DViewer] 任务模式');
+        // 任务模式：正常走路
+        const walkAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Walking', true);
+        if (walkAction) {
+          currentActionRef.current = walkAction;
+        }
+        console.log('[Robot3DViewer] 任务模式/行走');
+        break;
+        
+      case 'wave':
+        // 挥手动画
+        const waveAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Wave', false);
+        if (waveAction) {
+          currentActionRef.current = waveAction;
+          // 挥手结束后恢复待机
+          waveAction.clampWhenFinished = true;
+          mixerRef.current.addEventListener('finished', () => {
+            const idleAction2 = loader.playAnimation(mixerRef.current!, animationsRef.current, 'Idle', true);
+            if (idleAction2) currentActionRef.current = idleAction2;
+          });
+        }
+        console.log('[Robot3DViewer] 挥手');
+        break;
+        
+      case 'dance':
+        // 跳舞动画
+        const danceAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Dance', true);
+        if (danceAction) {
+          currentActionRef.current = danceAction;
+        }
+        console.log('[Robot3DViewer] 跳舞');
         break;
         
       case 'reset':
-        // 重置姿态
-        animation.setSpeed(1.0);
-        animation.start();
-        if (sceneRef.current) {
-          const robot = sceneRef.current.children.find(child => child instanceof THREE.Group);
-          if (robot) {
-            robot.rotation.y = 0;
-          }
+        // 重置姿态和动画
+        if (robotGroupRef.current) {
+          robotGroupRef.current.rotation.y = 0;
+        }
+        const resetAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Walking', true);
+        if (resetAction) {
+          currentActionRef.current = resetAction;
         }
         console.log('[Robot3DViewer] 重置');
         break;
