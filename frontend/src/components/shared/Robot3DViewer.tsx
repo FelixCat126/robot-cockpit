@@ -63,13 +63,13 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         return;
       }
 
-      // 创建场景
+      // 创建场景 - 科技感赛博朋克风格
       const scene = new THREE.Scene();
       
-      // 创建渐变背景（天空效果）
-      const skyColor = new THREE.Color(0x87CEEB); // 天空蓝
-      scene.background = skyColor;
-      scene.fog = new THREE.Fog(skyColor, 10, 50); // 添加雾效
+      // 深色科技感背景
+      const bgColor = new THREE.Color(0x0a0a1a); // 深蓝黑
+      scene.background = bgColor;
+      scene.fog = new THREE.FogExp2(0x0a0a1a, 0.02); // 指数雾效
       
       sceneRef.current = scene;
 
@@ -89,43 +89,101 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
 
       mountRef.current.appendChild(renderer.domElement);
 
-      // 添加环境光
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      // 科技感光照系统
+      const ambientLight = new THREE.AmbientLight(0x4040ff, 0.3); // 蓝紫色环境光
       scene.add(ambientLight);
 
-      // 添加方向光
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(5, 10, 5);
-      directionalLight.castShadow = true;
-      directionalLight.shadow.camera.left = -5;
-      directionalLight.shadow.camera.right = 5;
-      directionalLight.shadow.camera.top = 5;
-      directionalLight.shadow.camera.bottom = -5;
-      directionalLight.shadow.camera.near = 0.1;
-      directionalLight.shadow.camera.far = 50;
-      directionalLight.shadow.mapSize.width = 1024;
-      directionalLight.shadow.mapSize.height = 1024;
-      scene.add(directionalLight);
-
-      // 添加地面
-      if (showGrid) {
-        const groundGeometry = new THREE.PlaneGeometry(10, 10);
-        const groundMaterial = new THREE.MeshLambertMaterial({
-          color: 0x333333,
-          side: THREE.DoubleSide,
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.y = 0;
-        ground.receiveShadow = true;
-        scene.add(ground);
-
-        // 添加网格线
-        const gridHelper = new THREE.GridHelper(10, 20, 0x666666, 0x444444);
-        gridHelper.position.y = 0.01;
-        scene.add(gridHelper);
+      // 主光源（冷色调）
+      const mainLight = new THREE.DirectionalLight(0x00ffff, 0.6); // 青色
+      mainLight.position.set(5, 10, 7.5);
+      mainLight.castShadow = true;
+      mainLight.shadow.mapSize.width = 2048;
+      mainLight.shadow.mapSize.height = 2048;
+      scene.add(mainLight);
+      
+      // 辅助光源（暖色对比）
+      const rimLight = new THREE.DirectionalLight(0xff00ff, 0.4); // 洋红色
+      rimLight.position.set(-5, 5, -5);
+      scene.add(rimLight);
+      
+      // 创建科技感地板 - 发光网格
+      const floorGeometry = new THREE.PlaneGeometry(30, 30);
+      const floorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x000033,
+        roughness: 0.3,
+        metalness: 0.8,
+        emissive: 0x001133, // 自发光
+        emissiveIntensity: 0.5
+      });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = 0;
+      floor.receiveShadow = true;
+      scene.add(floor);
+      
+      // 发光网格线
+      const gridHelper = new THREE.GridHelper(30, 30, 0x00ffff, 0x0066ff);
+      gridHelper.position.y = 0.02;
+      (gridHelper.material as THREE.Material).opacity = 0.6;
+      (gridHelper.material as THREE.Material).transparent = true;
+      scene.add(gridHelper);
+      
+      // 创建粒子星空背景
+      const particleCount = 500;
+      const particlesGeometry = new THREE.BufferGeometry();
+      const particlePositions = new Float32Array(particleCount * 3);
+      
+      for (let i = 0; i < particleCount * 3; i += 3) {
+        particlePositions[i] = (Math.random() - 0.5) * 50; // x
+        particlePositions[i + 1] = Math.random() * 20 + 2; // y
+        particlePositions[i + 2] = (Math.random() - 0.5) * 50; // z
       }
-
+      
+      particlesGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+      
+      const particlesMaterial = new THREE.PointsMaterial({
+        color: 0x00ffff,
+        size: 0.1,
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending
+      });
+      
+      const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
+      scene.add(particleSystem);
+      
+      // 添加科技感光柱
+      const pillarMaterial = new THREE.MeshStandardMaterial({
+        color: 0x0066ff,
+        emissive: 0x0044ff,
+        emissiveIntensity: 1,
+        metalness: 0.9,
+        roughness: 0.1,
+        transparent: true,
+        opacity: 0.6
+      });
+      
+      const pillarGeometry = new THREE.CylinderGeometry(0.1, 0.1, 8, 16);
+      
+      // 四个角的光柱
+      const positions = [
+        [-10, 4, -10],
+        [10, 4, -10],
+        [-10, 4, 10],
+        [10, 4, 10]
+      ];
+      
+      positions.forEach(pos => {
+        const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+        pillar.position.set(pos[0], pos[1], pos[2]);
+        scene.add(pillar);
+        
+        // 每个光柱顶部添加点光源
+        const pointLight = new THREE.PointLight(0x00ffff, 0.5, 10);
+        pointLight.position.set(pos[0], pos[1] + 4, pos[2]);
+        scene.add(pointLight);
+      });
+      
       // 添加坐标轴
       if (showAxes) {
         const axesHelper = new THREE.AxesHelper(2);
