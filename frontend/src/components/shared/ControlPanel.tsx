@@ -6,24 +6,28 @@
 import { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { getIcon } from '../ControlIcons';
+import { useRobot3DStore } from '../../stores/robot3DStore';
 import './CompactStyles.css';
 
 interface ControlPanelProps {
   screenId?: number;
   compact?: boolean;
   className?: string;
+  onRobotControl?: (command: string) => void; // 新增：机器人控制回调
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({ 
   screenId = 0, 
   compact = false,
-  className = ''
+  className = '',
+  onRobotControl
 }) => {
   const { connected, publish } = useWebSocket({
     screenId,
     topics: ['/robot/commands'],
   });
   const [selectedCommand, setSelectedCommand] = useState<string>('');
+  const { setCommand } = useRobot3DStore();
 
   // 控制命令列表
   const commandCategories = [
@@ -71,12 +75,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       screenId: screenId,
     };
     
+    // 1. 发送到后端（将来用于真实机器人）
     if (connected && publish) {
       publish('/robot/commands', command);
-      console.log('[ControlPanel] 发送命令:', command);
+      console.log('[ControlPanel] 发送命令到后端:', command);
     } else {
       console.warn('[ControlPanel] WebSocket未连接，无法发送命令');
     }
+    
+    // 2. 触发本地3D机器人控制（通过Zustand状态）
+    setCommand(commandId);
+    if (onRobotControl) {
+      onRobotControl(commandId);
+    }
+    console.log('[ControlPanel] 触发本地3D机器人控制:', commandId);
     
     setSelectedCommand(commandId);
   };

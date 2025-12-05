@@ -3,7 +3,7 @@
  * 在一个屏幕上以Grid布局展示所有功能
  */
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import websocketService from '../services/websocket';
 import remoteLogger from '../utils/remoteLogger';

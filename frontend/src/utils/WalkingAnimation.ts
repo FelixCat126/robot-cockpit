@@ -58,6 +58,13 @@ export class WalkingAnimation {
   setWalkSpeed(speed: number): void {
     this.config.walkSpeed = Math.max(0.5, Math.min(2.0, speed));
   }
+  
+  /**
+   * 设置速度（别名，为了兼容）
+   */
+  setSpeed(speed: number): void {
+    this.setWalkSpeed(speed);
+  }
 
   /**
    * 动画循环

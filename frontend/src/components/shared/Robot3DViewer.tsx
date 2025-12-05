@@ -7,6 +7,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RealisticHumanoidGenerator } from '../../utils/RealisticHumanoidGenerator';
 import { WalkingAnimation } from '../../utils/WalkingAnimation';
+import { useRobot3DStore } from '../../stores/robot3DStore';
 
 export interface Robot3DViewerProps {
   width: number;
@@ -36,6 +37,9 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   const animationIdRef = useRef<number>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // 从全局状态获取控制指令
+  const { currentCommand } = useRobot3DStore();
 
   useLayoutEffect(() => {
     if (!mountRef.current) {
@@ -194,6 +198,84 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       setIsLoading(false);
     }
   }, [width, height, enableAutoRotate, showGrid, showAxes, backgroundColor]);
+  
+  // 监听控制指令并执行动作
+  useEffect(() => {
+    if (!currentCommand || !animationRef.current) return;
+    
+    console.log('[Robot3DViewer] 收到控制指令:', currentCommand);
+    const animation = animationRef.current;
+    
+    switch (currentCommand) {
+      case 'forward':
+      case 'start':
+      case 'resume':
+        animation.setSpeed(1.5);
+        animation.start();
+        console.log('[Robot3DViewer] 前进/启动');
+        break;
+        
+      case 'backward':
+        animation.setSpeed(1.0);
+        animation.start();
+        console.log('[Robot3DViewer] 后退');
+        break;
+        
+      case 'left':
+        // 左转：增加Y轴旋转
+        if (sceneRef.current) {
+          const robot = sceneRef.current.children.find(child => child instanceof THREE.Group);
+          if (robot) {
+            robot.rotation.y += Math.PI / 4;
+            console.log('[Robot3DViewer] 左转45度');
+          }
+        }
+        break;
+        
+      case 'right':
+        // 右转：减少Y轴旋转
+        if (sceneRef.current) {
+          const robot = sceneRef.current.children.find(child => child instanceof THREE.Group);
+          if (robot) {
+            robot.rotation.y -= Math.PI / 4;
+            console.log('[Robot3DViewer] 右转45度');
+          }
+        }
+        break;
+        
+      case 'stop':
+      case 'pause':
+      case 'emergency_stop':
+        animation.stop();
+        console.log('[Robot3DViewer] 停止');
+        break;
+        
+      case 'patrol':
+      case 'clean':
+      case 'transport':
+        // 任务模式：中速行走
+        animation.setSpeed(1.2);
+        animation.start();
+        console.log('[Robot3DViewer] 任务模式');
+        break;
+        
+      case 'reset':
+        // 重置姿态
+        animation.setSpeed(1.0);
+        animation.start();
+        if (sceneRef.current) {
+          const robot = sceneRef.current.children.find(child => child instanceof THREE.Group);
+          if (robot) {
+            robot.rotation.y = 0;
+          }
+        }
+        console.log('[Robot3DViewer] 重置');
+        break;
+        
+      default:
+        console.log('[Robot3DViewer] 未知指令:', currentCommand);
+    }
+  }, [currentCommand]);
 
   // 响应窗口大小变化
   useEffect(() => {
