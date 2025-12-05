@@ -3,7 +3,7 @@
  * 实现自然的人形机器人走路动画
  */
 
-import { HumanoidRobot } from './HumanoidRobotGenerator';
+import type { HumanoidRobot } from './RealisticHumanoidGenerator';
 
 export interface WalkingAnimationConfig {
   walkSpeed?: number;        // 行走速度 (0.5 - 2.0)
@@ -131,7 +131,7 @@ export class WalkingAnimation {
    * 应用关节角度到机器人模型
    */
   private applyJointAngles(angles: Record<string, number>): void {
-    const { joints, limbs } = this.robot;
+    const { joints } = this.robot;
 
     // 左腿
     if (joints.leftHip) {
@@ -165,9 +165,9 @@ export class WalkingAnimation {
       joints.rightElbow.rotation.x = angles.rightElbowX;
     }
 
-    // 躯干上下晃动
-    if (limbs.torso) {
-      limbs.torso.position.y = 1.2 + angles.bodyBob;
+    // 躯干上下晃动（使用根节点group）
+    if (this.robot.group) {
+      this.robot.group.position.y = angles.bodyBob;
     }
 
     // 头部点头

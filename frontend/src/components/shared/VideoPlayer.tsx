@@ -28,6 +28,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [useSimulation, setUseSimulation] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
   const [cameraInfo, setCameraInfo] = useState({
     width: 1920,
     height: 1080,
@@ -230,6 +231,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [initializeVideo, cleanupResources]);
 
+  // 时钟更新
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   // 播放/暂停
   const handlePlayPause = () => {
     if (videoRef.current) {
@@ -306,7 +316,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <div className="video-overlay">
             <div className="overlay-info">
               <span className="live-badge">🔴 LIVE</span>
-              <span className="timestamp">{new Date().toLocaleTimeString()}</span>
+              <span className="timestamp">{currentTime}</span>
             </div>
           </div>
         )}

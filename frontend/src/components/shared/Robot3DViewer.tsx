@@ -5,7 +5,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { HumanoidRobotGenerator } from '../../utils/HumanoidRobotGenerator';
+import { RealisticHumanoidGenerator } from '../../utils/RealisticHumanoidGenerator';
 import { WalkingAnimation } from '../../utils/WalkingAnimation';
 
 export interface Robot3DViewerProps {
@@ -121,10 +121,8 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         scene.add(axesHelper);
       }
 
-      // 创建人形机器人
-      const robotGenerator = new HumanoidRobotGenerator({
-        scale: 0.8,
-      });
+      // 创建人形机器人（使用更真实的生成器）
+      const robotGenerator = new RealisticHumanoidGenerator(0.8);
       const robot = robotGenerator.generate();
       scene.add(robot.group);
 
@@ -188,7 +186,7 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         });
         
         renderer.dispose();
-        robotGenerator.dispose(robot);
+        // RealisticHumanoidGenerator 不需要dispose方法
       };
     } catch (err) {
       console.error('[Robot3DViewer] 初始化失败:', err);
