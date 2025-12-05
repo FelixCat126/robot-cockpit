@@ -37,7 +37,7 @@ export class GLTFRobotLoader {
           const mixer = new THREE.AnimationMixer(gltf.scene);
           
           // 调整模型大小和位置
-          gltf.scene.scale.set(0.8, 0.8, 0.8);
+          gltf.scene.scale.set(0.5, 0.5, 0.5);  // 缩小到0.5倍
           gltf.scene.position.y = 0;
           
           // 启用阴影

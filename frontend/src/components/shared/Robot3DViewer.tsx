@@ -65,7 +65,12 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
 
       // 创建场景
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(backgroundColor);
+      
+      // 创建渐变背景（天空效果）
+      const skyColor = new THREE.Color(0x87CEEB); // 天空蓝
+      scene.background = skyColor;
+      scene.fog = new THREE.Fog(skyColor, 10, 50); // 添加雾效
+      
       sceneRef.current = scene;
 
       // 创建相机
