@@ -45,7 +45,7 @@ class EventEmitter {
 
 class WebSocketService extends EventEmitter {
   private socket: Socket | null = null;
-  private isConnected: boolean = false;
+  private isConnectedFlag: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 10;
   private serverUrl: string;
@@ -59,7 +59,7 @@ class WebSocketService extends EventEmitter {
    * 连接到WebSocket服务器
    */
   connect(): void {
-    if (this.isConnected) {
+    if (this.isConnectedFlag) {
       console.warn('[WebSocket] Already connected');
       return;
     }
@@ -76,20 +76,27 @@ class WebSocketService extends EventEmitter {
   }
 
   /**
+   * 获取连接状态
+   */
+  isConnected(): boolean {
+    return this.isConnectedFlag;
+  }
+
+  /**
    * 设置事件处理器
    */
   private setupEventHandlers(): void {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      this.isConnected = true;
+      this.isConnectedFlag = true;
       this.reconnectAttempts = 0;
       console.log('[WebSocket] Connected');
       this.emit('connected');
     });
 
     this.socket.on('disconnect', (reason) => {
-      this.isConnected = false;
+      this.isConnectedFlag = false;
       console.log(`[WebSocket] Disconnected: ${reason}`);
       this.emit('disconnected', reason);
     });
@@ -156,7 +163,7 @@ class WebSocketService extends EventEmitter {
    * 注册屏幕ID
    */
   registerScreen(screenId: number): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       console.warn('[WebSocket] Cannot register screen: not connected');
       return;
     }
@@ -168,7 +175,7 @@ class WebSocketService extends EventEmitter {
    * 订阅ROS2话题
    */
   subscribeTopic(topic: string, type?: string): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       console.warn('[WebSocket] Cannot subscribe: not connected');
       return;
     }
@@ -181,7 +188,7 @@ class WebSocketService extends EventEmitter {
    * 取消订阅ROS2话题
    */
   unsubscribeTopic(topic: string): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       console.warn('[WebSocket] Cannot unsubscribe: not connected');
       return;
     }
@@ -194,7 +201,7 @@ class WebSocketService extends EventEmitter {
    * 发布消息到ROS2话题
    */
   publishTopic(topic: string, message: any, type: string = 'std_msgs/String'): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       console.warn('[WebSocket] Cannot publish: not connected');
       return;
     }
@@ -206,7 +213,7 @@ class WebSocketService extends EventEmitter {
    * 发送心跳
    */
   ping(): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       return;
     }
 
@@ -220,7 +227,7 @@ class WebSocketService extends EventEmitter {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      this.isConnected = false;
+      this.isConnectedFlag = false;
       console.log('[WebSocket] Disconnected');
     }
   }
@@ -229,7 +236,7 @@ class WebSocketService extends EventEmitter {
    * 选择机器人（发送到后端）
    */
   selectRobot(robotId: string): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       console.warn('[WebSocket] Cannot select robot: not connected');
       return;
     }
@@ -242,7 +249,7 @@ class WebSocketService extends EventEmitter {
    * 退出登录（发送到后端）
    */
   logout(): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       console.warn('[WebSocket] Cannot logout: not connected');
       return;
     }
@@ -255,7 +262,7 @@ class WebSocketService extends EventEmitter {
    * 取消机器人选择（发送到后端）
    */
   deselectRobot(): void {
-    if (!this.socket || !this.isConnected) {
+    if (!this.socket || !this.isConnectedFlag) {
       console.warn('[WebSocket] Cannot deselect robot: not connected');
       return;
     }
@@ -269,7 +276,7 @@ class WebSocketService extends EventEmitter {
    */
   getStatus(): { connected: boolean; serverUrl: string } {
     return {
-      connected: this.isConnected,
+      connected: this.isConnectedFlag,
       serverUrl: this.serverUrl,
     };
   }

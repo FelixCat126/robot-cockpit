@@ -82,6 +82,30 @@ class WebSocketService extends EventEmitter {
       this.log('info', `Broadcasted robot_deselected to all clients`);
     });
     
+    // ========== WebRTC信令处理（新增，不影响现有功能） ==========
+    
+    // WebRTC客户端/机器人注册
+    socket.on('register', (data) => {
+      this.handleWebRTCRegister(socket, data);
+    });
+
+    // 转发Offer（从客户端到机器人）
+    socket.on('offer', (data) => {
+      this.handleWebRTCOffer(socket, data);
+    });
+
+    // 转发Answer（从机器人到客户端）
+    socket.on('answer', (data) => {
+      this.handleWebRTCAnswer(socket, data);
+    });
+
+    // 转发ICE候选
+    socket.on('ice-candidate', (data) => {
+      this.handleWebRTCIceCandidate(socket, data);
+    });
+    
+    // ========== 现有事件处理器 ==========
+    
     // 客户端断开连接
     socket.on('disconnect', () => {
       this.handleDisconnect(socket);
@@ -253,6 +277,139 @@ class WebSocketService extends EventEmitter {
   log(level, message) {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] [WebSocketService] [${level.toUpperCase()}] ${message}`);
+  }
+
+  // ========== WebRTC信令处理方法（新增） ==========
+
+  /**
+   * 处理WebRTC注册（客户端或机器人）
+   */
+  handleWebRTCRegister(socket, data) {
+    const { role, robotId } = data; // role: 'client' | 'robot'
+    
+    // 扩展客户端信息，存储WebRTC相关数据
+    const clientInfo = this.clients.get(socket.id);
+    if (clientInfo) {
+      clientInfo.webrtcRole = role;
+      clientInfo.robotId = robotId;
+      this.log('info', `[WebRTC] ${role} registered: ${robotId} (socket: ${socket.id})`);
+      socket.emit('registered', { success: true, role, robotId });
+    } else {
+      socket.emit('registered', { success: false, error: 'Client not found' });
+    }
+  }
+
+  /**
+   * 处理WebRTC Offer（从客户端到机器人）
+   */
+  handleWebRTCOffer(socket, data) {
+    const { sdp, robotId } = data;
+    this.log('info', `[WebRTC] Received offer for robot: ${robotId}`);
+
+    // 查找对应的机器人socket
+    const robotSocket = this.findWebRTCPeer(robotId, 'robot');
+    
+    if (robotSocket) {
+      // 转发Offer到机器人，附上客户端ID
+      robotSocket.emit('offer', {
+        sdp,
+        clientId: socket.id,
+      });
+      this.log('info', `[WebRTC] Forwarded offer to robot ${robotId}`);
+    } else {
+      this.log('warn', `[WebRTC] Robot not found: ${robotId}`);
+      socket.emit('error', { message: `Robot ${robotId} not connected` });
+    }
+  }
+
+  /**
+   * 处理WebRTC Answer（从机器人到客户端）
+   */
+  handleWebRTCAnswer(socket, data) {
+    const { sdp, clientId } = data;
+    this.log('info', `[WebRTC] Received answer for client: ${clientId}`);
+
+    // 查找对应的客户端socket
+    const clientSocket = this.io.sockets.sockets.get(clientId);
+    
+    if (clientSocket) {
+      // 转发Answer到客户端
+      clientSocket.emit('answer', { sdp });
+      this.log('info', `[WebRTC] Forwarded answer to client ${clientId}`);
+    } else {
+      this.log('warn', `[WebRTC] Client not found: ${clientId}`);
+    }
+  }
+
+  /**
+   * 处理ICE候选（双向转发）
+   */
+  handleWebRTCIceCandidate(socket, data) {
+    const { candidate, robotId, targetId } = data;
+
+    // 如果指定了targetId，直接转发到该socket
+    if (targetId) {
+      const targetSocket = this.io.sockets.sockets.get(targetId);
+      if (targetSocket) {
+        targetSocket.emit('ice-candidate', { candidate });
+        this.log('debug', `[WebRTC] Forwarded ICE candidate to ${targetId}`);
+      }
+      return;
+    }
+
+    // 如果指定了robotId，查找对应的机器人或客户端
+    if (robotId) {
+      const clientInfo = this.clients.get(socket.id);
+      const targetRole = clientInfo?.webrtcRole === 'client' ? 'robot' : 'client';
+      const targetSocket = this.findWebRTCPeer(robotId, targetRole);
+      
+      if (targetSocket) {
+        targetSocket.emit('ice-candidate', { candidate });
+        this.log('debug', `[WebRTC] Forwarded ICE candidate to ${targetRole} ${robotId}`);
+      }
+    }
+  }
+
+  /**
+   * 查找WebRTC对等端（客户端或机器人）
+   */
+  findWebRTCPeer(robotId, role) {
+    for (const [socketId, clientInfo] of this.clients) {
+      if (clientInfo.robotId === robotId && clientInfo.webrtcRole === role) {
+        return this.io.sockets.sockets.get(socketId);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 获取WebRTC连接统计
+   */
+  getWebRTCStats() {
+    const stats = {
+      clients: 0,
+      robots: 0,
+      connections: [],
+    };
+
+    for (const [socketId, clientInfo] of this.clients) {
+      if (clientInfo.webrtcRole === 'client') {
+        stats.clients++;
+      } else if (clientInfo.webrtcRole === 'robot') {
+        stats.robots++;
+      }
+
+      if (clientInfo.webrtcRole && clientInfo.robotId) {
+        stats.connections.push({
+          socketId,
+          role: clientInfo.webrtcRole,
+          robotId: clientInfo.robotId,
+          connectedAt: clientInfo.connectedAt,
+        });
+      }
+    }
+
+    return stats;
   }
 }
 

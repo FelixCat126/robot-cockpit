@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import websocketService, { TopicData } from '../services/websocket';
+import { communicationService as websocketService, TopicData } from '../services';
 
 export interface UseWebSocketOptions {
   autoConnect?: boolean;

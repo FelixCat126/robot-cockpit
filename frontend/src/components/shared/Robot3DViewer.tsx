@@ -7,6 +7,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFRobotLoader } from '../../utils/GLTFRobotLoader';
 import { useRobot3DStore } from '../../stores/robot3DStore';
+import { JointStateManager } from '../../utils/JointStateManager';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 export interface Robot3DViewerProps {
   width: number;
@@ -42,6 +44,15 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   
   // 从全局状态获取控制指令
   const { currentCommand } = useRobot3DStore();
+
+  // 新增：关节状态管理器
+  const jointManagerRef = useRef<JointStateManager>();
+
+  // 新增：订阅关节状态话题（用于实时同步远端机器人姿态）
+  const { getTopicData } = useWebSocket({
+    topics: ['/joint_states'], // 订阅机器人关节状态
+    autoConnect: false, // 不自动连接，避免影响现有逻辑
+  });
 
   useLayoutEffect(() => {
     if (!mountRef.current) {
@@ -215,6 +226,17 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       if (walkingAnimation) {
         currentActionRef.current = walkingAnimation;
       }
+
+      // 新增：初始化关节状态管理器
+      try {
+        jointManagerRef.current = new JointStateManager();
+        jointManagerRef.current.mapJointsFromScene(robotModel.scene);
+        jointManagerRef.current.setInterpolation(true, 0.3); // 启用平滑插值
+        console.log('[Robot3DViewer] 关节状态管理器已初始化');
+        console.log('[Robot3DViewer] 映射的关节:', jointManagerRef.current.getMappedJoints());
+      } catch (err) {
+        console.warn('[Robot3DViewer] 关节管理器初始化失败:', err);
+      }
       
       setIsLoading(false);
       }).catch((error) => {
@@ -281,6 +303,11 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         
         renderer.dispose();
         // RealisticHumanoidGenerator 不需要dispose方法
+        
+        // 清理关节管理器
+        if (jointManagerRef.current) {
+          jointManagerRef.current.clear();
+        }
       };
     } catch (err) {
       console.error('[Robot3DViewer] 初始化失败:', err);
@@ -288,6 +315,23 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       setIsLoading(false);
     }
   }, [width, height, enableAutoRotate, showGrid, showAxes, backgroundColor]);
+
+  // 新增：监听关节状态数据并更新机器人姿态
+  useEffect(() => {
+    // 获取最新的关节状态数据
+    const jointStateData = getTopicData('/joint_states');
+    
+    // 如果有数据且关节管理器已初始化，则更新关节
+    if (jointStateData && jointManagerRef.current) {
+      try {
+        jointManagerRef.current.updateJointStates(jointStateData);
+        // 注意：不打印日志避免刷屏，关节管理器内部已有统计
+      } catch (err) {
+        console.error('[Robot3DViewer] 更新关节状态失败:', err);
+      }
+    }
+    // 如果没有关节状态数据，Walking动画会继续播放（现有功能不受影响）
+  }, [getTopicData]);
   
   // 监听控制指令并执行动作
   useEffect(() => {

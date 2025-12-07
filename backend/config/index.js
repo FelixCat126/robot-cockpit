@@ -113,6 +113,45 @@ const config = {
     level: process.env.LOG_LEVEL || 'info',
     format: 'json',
   },
+
+  // WebRTC配置
+  webrtc: {
+    // WebRTC功能开关（默认关闭，不影响现有功能）
+    enabled: process.env.WEBRTC_ENABLED === 'true',
+    
+    // 信令服务器URL（通常就是本地Express服务器）
+    signalingUrl: process.env.SIGNALING_URL || 'ws://localhost:3000',
+    
+    // STUN/TURN服务器配置（用于NAT穿透）
+    iceServers: [
+      {
+        urls: [
+          'stun:stun.l.google.com:19302',
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
+        ],
+      },
+      // TURN服务器配置（如果需要）
+      // {
+      //   urls: 'turn:your-turn-server.com:3478',
+      //   username: process.env.TURN_USERNAME || 'username',
+      //   credential: process.env.TURN_PASSWORD || 'password',
+      // },
+    ],
+    
+    // 视频编码配置
+    video: {
+      codec: process.env.VIDEO_CODEC || 'H264', // H264, VP8, VP9
+      maxBitrate: parseInt(process.env.VIDEO_MAX_BITRATE || '2000', 10), // kbps
+      maxFrameRate: parseInt(process.env.VIDEO_MAX_FPS || '30', 10),
+    },
+    
+    // DataChannel配置
+    dataChannel: {
+      ordered: true, // 保证消息顺序
+      maxRetransmits: 3, // 最大重传次数
+    },
+  },
 };
 
 module.exports = config;
