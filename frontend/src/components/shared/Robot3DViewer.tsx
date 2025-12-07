@@ -39,6 +39,7 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   const robotGroupRef = useRef<THREE.Group>();
   const currentActionRef = useRef<THREE.AnimationAction>();
   const animationsRef = useRef<THREE.AnimationClip[]>([]);
+  const backgroundGroupRef = useRef<THREE.Group>(); // 新增：背景元素组
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -116,6 +117,12 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       const rimLight = new THREE.DirectionalLight(0xff00ff, 0.4); // 洋红色
       rimLight.position.set(-5, 5, -5);
       scene.add(rimLight);
+
+      // 新增：创建背景组（用于旋转背景而不旋转机器人）
+      const backgroundGroup = new THREE.Group();
+      backgroundGroup.name = 'backgroundGroup';
+      scene.add(backgroundGroup);
+      backgroundGroupRef.current = backgroundGroup;
       
       // 创建科技感地板 - 发光网格
       const floorGeometry = new THREE.PlaneGeometry(30, 30);
@@ -130,14 +137,14 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       floor.rotation.x = -Math.PI / 2;
       floor.position.y = 0;
       floor.receiveShadow = true;
-      scene.add(floor);
+      backgroundGroup.add(floor); // 添加到背景组
       
       // 发光网格线
       const gridHelper = new THREE.GridHelper(30, 30, 0x00ffff, 0x0066ff);
       gridHelper.position.y = 0.02;
       (gridHelper.material as THREE.Material).opacity = 0.6;
       (gridHelper.material as THREE.Material).transparent = true;
-      scene.add(gridHelper);
+      backgroundGroup.add(gridHelper); // 添加到背景组
       
       // 创建粒子星空背景
       const particleCount = 500;
@@ -161,7 +168,7 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       });
       
       const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
-      scene.add(particleSystem);
+      backgroundGroup.add(particleSystem); // 添加到背景组
       
       // 添加科技感光柱
       const pillarMaterial = new THREE.MeshStandardMaterial({
@@ -187,12 +194,12 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       positions.forEach(pos => {
         const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
         pillar.position.set(pos[0], pos[1], pos[2]);
-        scene.add(pillar);
+        backgroundGroup.add(pillar); // 添加到背景组
         
         // 每个光柱顶部添加点光源
         const pointLight = new THREE.PointLight(0x00ffff, 0.5, 10);
         pointLight.position.set(pos[0], pos[1] + 4, pos[2]);
-        scene.add(pointLight);
+        backgroundGroup.add(pointLight); // 添加到背景组
       });
       
       // 添加坐标轴
@@ -245,8 +252,7 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         setIsLoading(false);
       });
 
-      // 相机自动旋转
-      let cameraAngle = 0;
+      // 背景旋转逻辑
       const clock = new THREE.Clock();
 
       // 动画循环
@@ -259,12 +265,9 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           mixerRef.current.update(delta);
         }
 
-        // 相机旋转
-        if (enableAutoRotate) {
-          cameraAngle += 0.003;
-          camera.position.x = Math.cos(cameraAngle) * 5;
-          camera.position.z = Math.sin(cameraAngle) * 5;
-          camera.lookAt(0, 1, 0);
+        // 背景旋转（机器人保持面向观众）
+        if (enableAutoRotate && backgroundGroup) {
+          backgroundGroup.rotation.y += 0.003; // 慢速旋转背景
         }
 
         renderer.render(scene, camera);
