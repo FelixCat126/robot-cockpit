@@ -22,6 +22,7 @@ export const SingleScreenLayout: React.FC = () => {
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(() => {
     return localStorage.getItem('robot_cockpit_selected_robot') || null;
   });
+  const [connected, setConnected] = useState(false);
   
   checkAuthRef.current = checkAuth;
 
@@ -42,9 +43,15 @@ export const SingleScreenLayout: React.FC = () => {
     const handleConnected = () => {
       // 单屏模式使用screenId=0
       websocketService.registerScreen(0);
+      setConnected(true);
+    };
+    
+    const handleDisconnected = () => {
+      setConnected(false);
     };
     
     websocketService.on('connected', handleConnected);
+    websocketService.on('disconnected', handleDisconnected);
     
     if (websocketService.getStatus().connected) {
       websocketService.registerScreen(0);
@@ -91,6 +98,7 @@ export const SingleScreenLayout: React.FC = () => {
 
     return () => {
       websocketService.off('connected', handleConnected);
+      websocketService.off('disconnected', handleDisconnected);
       websocketService.off('auth_status_change', handleAuthStatusChange);
       websocketService.off('robot_selected', handleRobotSelected);
       websocketService.off('user_logged_out', handleUserLoggedOut);
@@ -161,7 +169,14 @@ export const SingleScreenLayout: React.FC = () => {
       <main className="layout-grid">
         {/* 左上：控制面板（紧凑） */}
         <section className="grid-control">
-          <ControlPanel compact={true} screenId={0} />
+          <ControlPanel 
+            compact={false}
+            screenId={0}
+            enablePeripherals={true}
+            showPeripheralDebug={false}
+            connected={connected}
+            publish={(topic, message, type) => websocketService.publishTopic(topic, message, type)}
+          />
         </section>
         
         {/* 中间大区域：视频流 */}

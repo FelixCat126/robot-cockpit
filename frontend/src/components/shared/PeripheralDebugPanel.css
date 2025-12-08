@@ -1,0 +1,357 @@
+/**
+ * 外设调试面板样式
+ */
+
+.peripheral-debug-panel {
+  background: rgba(20, 20, 40, 0.95);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  color: #e0e0e0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.peripheral-debug-panel h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #00ffff;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+  padding-bottom: 8px;
+}
+
+.peripheral-debug-panel h4 {
+  margin: 16px 0 8px 0;
+  font-size: 14px;
+  color: #00ccff;
+}
+
+.peripheral-debug-panel h5 {
+  margin: 8px 0 6px 0;
+  font-size: 12px;
+  color: #0099cc;
+  text-transform: uppercase;
+}
+
+/* 紧凑模式 */
+.peripheral-debug-panel.compact {
+  padding: 12px;
+  max-height: 400px;
+}
+
+.peripheral-debug-panel.compact h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.peripheral-debug-panel.compact h5 {
+  font-size: 11px;
+}
+
+/* 警告信息 */
+.debug-warning,
+.no-devices {
+  text-align: center;
+  padding: 20px;
+  color: #ffaa00;
+  font-size: 14px;
+}
+
+/* 重连提示 */
+.reconnect-notice {
+  background: rgba(255, 165, 0, 0.1);
+  border: 1px solid rgba(255, 165, 0, 0.5);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.reconnect-notice p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #ffa500;
+}
+
+.reconnect-notice .hint {
+  font-size: 12px;
+  color: #ff8800;
+  opacity: 0.8;
+}
+
+/* 错误提示 */
+.error-notice {
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.5);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.error-notice p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #ff4444;
+}
+
+.error-notice .hint {
+  font-size: 12px;
+  color: #ff6666;
+  opacity: 0.8;
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 设备列表 */
+.devices-section {
+  margin-bottom: 16px;
+}
+
+.device-status {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(100, 100, 100, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.device-status.connected {
+  border-color: rgba(0, 255, 0, 0.5);
+}
+
+.device-status.connecting {
+  border-color: rgba(255, 255, 0, 0.5);
+}
+
+.device-status.disconnected,
+.device-status.error {
+  border-color: rgba(255, 0, 0, 0.5);
+  opacity: 0.6;
+}
+
+.device-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+}
+
+.device-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.device-type {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  background: rgba(100, 100, 100, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* 轴向显示 */
+.axes-display {
+  margin-bottom: 12px;
+}
+
+.axis-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.axis-label {
+  font-size: 11px;
+  color: #aaa;
+  min-width: 80px;
+}
+
+.axis-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(50, 50, 50, 0.8);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.axis-value {
+  height: 100%;
+  background: linear-gradient(90deg, #00aaff, #00ffff);
+  transition: width 0.05s linear;
+}
+
+.axis-number {
+  font-size: 11px;
+  color: #0ff;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* 按钮显示 */
+.buttons-display {
+  margin-bottom: 12px;
+}
+
+.button-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.button-item {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(100, 100, 100, 0.3);
+  border: 1px solid rgba(100, 100, 100, 0.5);
+  color: #888;
+}
+
+.button-item.active {
+  background: rgba(0, 255, 0, 0.3);
+  border-color: #0f0;
+  color: #0f0;
+  font-weight: bold;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+}
+
+.no-press {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+/* 键盘按键显示 */
+.keys-display {
+  margin-bottom: 12px;
+}
+
+.key-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.key-item {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(0, 255, 255, 0.2);
+  border: 1px solid #0ff;
+  color: #0ff;
+  font-weight: bold;
+  min-width: 32px;
+  text-align: center;
+}
+
+/* 事件日志 */
+.events-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(100, 100, 100, 0.3);
+}
+
+.event-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.no-events {
+  text-align: center;
+  padding: 12px;
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.event-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  font-size: 11px;
+  border-left: 2px solid #0ff;
+}
+
+.event-time {
+  color: #666;
+  min-width: 90px;
+}
+
+.event-device {
+  color: #888;
+  text-transform: uppercase;
+  min-width: 60px;
+}
+
+.event-desc {
+  color: #0ff;
+  flex: 1;
+}
+
+/* 滚动条样式 */
+.peripheral-debug-panel::-webkit-scrollbar,
+.event-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.peripheral-debug-panel::-webkit-scrollbar-track,
+.event-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.peripheral-debug-panel::-webkit-scrollbar-thumb,
+.event-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.peripheral-debug-panel::-webkit-scrollbar-thumb:hover,
+.event-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 255, 0.5);
+}
+
+/* 状态指示器 */
+.peripheral-controller-status {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.status-indicator {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-indicator.active {
+  background: rgba(0, 255, 0, 0.2);
+  border: 1px solid rgba(0, 255, 0, 0.5);
+  color: #0f0;
+}
+
+.status-indicator.error {
+  background: rgba(255, 0, 0, 0.2);
+  border: 1px solid rgba(255, 0, 0, 0.5);
+  color: #f00;
+}
+

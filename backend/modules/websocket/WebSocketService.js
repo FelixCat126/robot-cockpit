@@ -164,9 +164,12 @@ class WebSocketService extends EventEmitter {
     // 触发内部事件（给ROS2Bridge等模块使用）
     this.emit('publish_topic', { socketId: socket.id, topic, message, type });
     
-    // 对于音频流等实时数据，直接转发给所有订阅该话题的客户端
-    // 这样即使ROS2Bridge未运行，音频流也能在前端之间传输
-    if (topic === '/robot/audio/stream' || topic.includes('/audio/') || topic.includes('/video/')) {
+    // 对于需要跨屏幕共享的话题，直接转发给所有订阅该话题的客户端
+    // 包括：音频流、视频流、3D机器人控制命令等
+    if (topic === '/robot/audio/stream' || 
+        topic.includes('/audio/') || 
+        topic.includes('/video/') ||
+        topic === 'robot_3d_command') {
       this.log('debug', `Broadcasting real-time data for topic: ${topic}`);
       this.broadcastTopicData(topic, message);
     }

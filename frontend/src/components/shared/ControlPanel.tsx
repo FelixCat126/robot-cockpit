@@ -7,27 +7,46 @@ import { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { getIcon } from '../ControlIcons';
 import { useRobot3DStore } from '../../stores/robot3DStore';
+import { PeripheralController } from './PeripheralController';
+import { PeripheralDebugPanel } from './PeripheralDebugPanel';
+import { RobotCommand } from '../../types/peripheral.types';
 import './CompactStyles.css';
 
 interface ControlPanelProps {
   screenId?: number;
   compact?: boolean;
   className?: string;
-  onRobotControl?: (command: string) => void; // 新增：机器人控制回调
+  onRobotControl?: (command: string) => void; // 机器人控制回调
+  enablePeripherals?: boolean; // 是否启用外设控制
+  showPeripheralDebug?: boolean; // 是否显示外设调试面板
+  connected?: boolean; // 外部传入的WebSocket连接状态
+  publish?: (topic: string, message: any, type?: string) => void; // 外部传入的发布函数
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({ 
   screenId = 0, 
   compact = false,
   className = '',
-  onRobotControl
+  onRobotControl,
+  enablePeripherals = false,
+  showPeripheralDebug = false,
+  connected: externalConnected,
+  publish: externalPublish,
 }) => {
-  const { connected, publish } = useWebSocket({
+  // 如果外部传入了connected和publish，使用外部的；否则自己创建
+  const internalWebSocket = useWebSocket({
     screenId,
     topics: ['/robot/commands'],
+    autoConnect: !externalConnected, // 如果外部有连接，就不自动连接
   });
+  
+  const connected = externalConnected !== undefined ? externalConnected : internalWebSocket.connected;
+  const publish = externalPublish || internalWebSocket.publish;
   const [selectedCommand, setSelectedCommand] = useState<string>('');
   const { setCommand } = useRobot3DStore();
+  const [peripheralManager, setPeripheralManager] = useState<any>(null);
+  const [showDebug, setShowDebug] = useState(showPeripheralDebug);
+
 
   // 控制命令列表
   const commandCategories = [
@@ -50,12 +69,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       ],
     },
     {
-      title: '任务控制',
+      title: '动作控制',
       commands: [
-        { id: 'patrol', label: '巡检任务', color: '#8b5cf6' },
-        { id: 'clean', label: '清洁任务', color: '#8b5cf6' },
-        { id: 'transport', label: '运输任务', color: '#8b5cf6' },
-        { id: 'return', label: '返回基站', color: '#8b5cf6' },
+        { id: 'Wave', label: '挥手', color: '#06b6d4' },
+        { id: 'ThumbsUp', label: '点赞', color: '#06b6d4' },
+        { id: 'WalkJump', label: '跨栏', color: '#14b8a6' },
+        { id: 'Jump', label: '跳跃', color: '#14b8a6' },
       ],
     },
     {
@@ -69,6 +88,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   // 发送命令
   const handleSendCommand = (commandId: string) => {
+    console.log('[ControlPanel] Web按钮点击:', commandId);
     const command = {
       type: commandId,
       timestamp: new Date().toISOString(),
@@ -78,23 +98,78 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     // 1. 发送到后端（将来用于真实机器人）
     if (connected && publish) {
       publish('/robot/commands', command);
-      console.log('[ControlPanel] 发送命令到后端:', command);
+      
+      // 广播到其他屏幕（用于多屏3D同步）
+      publish('robot_3d_command', { command: commandId, timestamp: Date.now() }, 'std_msgs/String');
     } else {
       console.warn('[ControlPanel] WebSocket未连接，无法发送命令');
     }
     
     // 2. 触发本地3D机器人控制（通过Zustand状态）
-    setCommand(commandId);
+    // 添加时间戳确保每次点击都触发，即使是相同的命令
+    console.log('[ControlPanel] 调用setCommand:', commandId);
+    setCommand(commandId + '_' + Date.now());
     if (onRobotControl) {
       onRobotControl(commandId);
     }
-    console.log('[ControlPanel] 触发本地3D机器人控制:', commandId);
     
+    // 更新选中命令显示（不自动清除，避免与外设控制冲突）
     setSelectedCommand(commandId);
+  };
+
+  // 处理外设命令
+  const handlePeripheralCommand = (cmd: RobotCommand) => {
+    
+    // 更新选中命令显示
+    if (cmd.type === 'velocity') {
+      setSelectedCommand('external_control');
+    } else if (cmd.type === 'action') {
+      // 提取命令ID，用于高亮对应的web按钮
+      const commandId = cmd.payload?.data || 'external_action';
+      setSelectedCommand(commandId);
+      
+      // 同时发送命令（确保与web按钮行为一致）
+      if (connected && publish) {
+        publish('/robot/commands', {
+          type: commandId,
+          timestamp: new Date().toISOString(),
+          screenId: screenId,
+        });
+      }
+    }
   };
 
   return (
     <div className={`control-panel ${compact ? 'compact' : ''} ${className}`}>
+      {/* 外设控制器（隐藏组件，仅处理逻辑） */}
+      {enablePeripherals && (
+        <PeripheralController 
+          enabled={enablePeripherals} 
+          onCommandSent={handlePeripheralCommand}
+          onManagerReady={setPeripheralManager}
+        />
+      )}
+
+      {/* 外设调试面板切换按钮 */}
+      {enablePeripherals && !compact && (
+        <div className="peripheral-controls">
+          <button 
+            className="debug-toggle-btn"
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            {showDebug ? '🎮 隐藏外设调试' : '🎮 显示外设调试'}
+          </button>
+        </div>
+      )}
+
+      {/* 外设调试面板 */}
+      {enablePeripherals && showDebug && (
+        <PeripheralDebugPanel 
+          manager={peripheralManager} 
+          compact={compact}
+        />
+      )}
+
       <div className="control-content">
         {commandCategories.map((category) => (
           <div key={category.title} className="command-category">

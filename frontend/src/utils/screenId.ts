@@ -12,7 +12,7 @@ export function getScreenIdFromUrl(): number | null {
   }
 
   const id = parseInt(screenId, 10);
-  if (isNaN(id) || id < 0 || id > 2) {
+  if (isNaN(id) || id < 0 || id > 3) {
     console.warn(`Invalid screen ID: ${screenId}`);
     return null;
   }

@@ -209,7 +209,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       }
 
       // 加载GLTF机器人模型
-      console.log('[Robot3DViewer] 开始加载GLTF模型...');
       const loader = new GLTFRobotLoader();
       
       loader.load().then((robotModel) => {
@@ -218,9 +217,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       robotGroupRef.current = robotModel.scene;
       mixerRef.current = robotModel.mixer;
       animationsRef.current = robotModel.animations;
-      
-      console.log('[Robot3DViewer] 模型加载完成');
-      console.log('[Robot3DViewer] 可用动画:', loader.getAnimationNames(robotModel.animations));
       
       // 默认播放Walking动画（如果有）
       const walkingAnimation = loader.playAnimation(
@@ -239,10 +235,8 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         jointManagerRef.current = new JointStateManager();
         jointManagerRef.current.mapJointsFromScene(robotModel.scene);
         jointManagerRef.current.setInterpolation(true, 0.3); // 启用平滑插值
-        console.log('[Robot3DViewer] 关节状态管理器已初始化');
-        console.log('[Robot3DViewer] 映射的关节:', jointManagerRef.current.getMappedJoints());
       } catch (err) {
-        console.warn('[Robot3DViewer] 关节管理器初始化失败:', err);
+        console.error('[Robot3DViewer] 关节管理器初始化失败:', err);
       }
       
       setIsLoading(false);
@@ -338,9 +332,12 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   
   // 监听控制指令并执行动作
   useEffect(() => {
-    if (!currentCommand || !mixerRef.current || !animationsRef.current.length) return;
+    if (!currentCommand || !mixerRef.current || !animationsRef.current.length) {
+      return;
+    }
     
-    console.log('[Robot3DViewer] 收到控制指令:', currentCommand);
+    // 提取纯命令ID（去掉时间戳）
+    const commandId = currentCommand.split('_')[0];
     const loader = new GLTFRobotLoader();
     
     // 停止当前动作
@@ -348,7 +345,7 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       currentActionRef.current.stop();
     }
     
-    switch (currentCommand) {
+    switch (commandId) {
       case 'forward':
       case 'start':
       case 'resume':
@@ -358,7 +355,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           runAction.timeScale = 1.2; // 加速
           currentActionRef.current = runAction;
         }
-        console.log('[Robot3DViewer] 前进/跑步');
         break;
         
       case 'backward':
@@ -368,22 +364,23 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           walkBackAction.timeScale = -0.8; // 反向慢速
           currentActionRef.current = walkBackAction;
         }
-        console.log('[Robot3DViewer] 后退');
         break;
         
       case 'left':
-        // 左转：旋转机器人
+        // 左转：旋转机器人（每次都旋转45°）
+        console.log('[Robot3DViewer] 执行左转45°, currentCommand:', currentCommand, '当前角度:', robotGroupRef.current?.rotation.y);
         if (robotGroupRef.current) {
           robotGroupRef.current.rotation.y += Math.PI / 4;
-          console.log('[Robot3DViewer] 左转45度');
+          console.log('[Robot3DViewer] 左转后角度:', robotGroupRef.current.rotation.y);
         }
         break;
         
       case 'right':
-        // 右转：旋转机器人
+        // 右转：旋转机器人（每次都旋转45°）
+        console.log('[Robot3DViewer] 执行右转45°, currentCommand:', currentCommand, '当前角度:', robotGroupRef.current?.rotation.y);
         if (robotGroupRef.current) {
           robotGroupRef.current.rotation.y -= Math.PI / 4;
-          console.log('[Robot3DViewer] 右转45度');
+          console.log('[Robot3DViewer] 右转后角度:', robotGroupRef.current.rotation.y);
         }
         break;
         
@@ -395,33 +392,54 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         if (idleAction) {
           currentActionRef.current = idleAction;
         }
-        console.log('[Robot3DViewer] 停止/待机');
         break;
         
-      case 'patrol':
-      case 'clean':
-      case 'transport':
-        // 任务模式：正常走路
-        const walkAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Walking', true);
-        if (walkAction) {
-          currentActionRef.current = walkAction;
-        }
-        console.log('[Robot3DViewer] 任务模式/行走');
-        break;
-        
-      case 'wave':
-        // 挥手动画
+      case 'Wave':
+        // 挥手动画（播放一次）
         const waveAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Wave', false);
         if (waveAction) {
+          waveAction.reset();
+          waveAction.setLoop(THREE.LoopOnce, 1);
+          waveAction.clampWhenFinished = false;
+          waveAction.play();
           currentActionRef.current = waveAction;
-          // 挥手结束后恢复待机
-          waveAction.clampWhenFinished = true;
-          mixerRef.current.addEventListener('finished', () => {
-            const idleAction2 = loader.playAnimation(mixerRef.current!, animationsRef.current, 'Idle', true);
-            if (idleAction2) currentActionRef.current = idleAction2;
-          });
         }
-        console.log('[Robot3DViewer] 挥手');
+        break;
+        
+      case 'ThumbsUp':
+        // 点赞动画（播放一次）
+        const thumbsUpAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'ThumbsUp', false);
+        if (thumbsUpAction) {
+          thumbsUpAction.reset();
+          thumbsUpAction.setLoop(THREE.LoopOnce, 1);
+          thumbsUpAction.clampWhenFinished = false;
+          thumbsUpAction.play();
+          currentActionRef.current = thumbsUpAction;
+        }
+        break;
+        
+      case 'WalkJump':
+        // 跨栏动画（播放一次）
+        const walkJumpAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'WalkJump', false);
+        if (walkJumpAction) {
+          walkJumpAction.reset();
+          walkJumpAction.setLoop(THREE.LoopOnce, 1);
+          walkJumpAction.clampWhenFinished = false;
+          walkJumpAction.play();
+          currentActionRef.current = walkJumpAction;
+        }
+        break;
+        
+      case 'Jump':
+        // 跳跃动画（播放一次）
+        const jumpAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Jump', false);
+        if (jumpAction) {
+          jumpAction.reset();
+          jumpAction.setLoop(THREE.LoopOnce, 1);
+          jumpAction.clampWhenFinished = false;
+          jumpAction.play();
+          currentActionRef.current = jumpAction;
+        }
         break;
         
       case 'dance':
@@ -430,7 +448,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         if (danceAction) {
           currentActionRef.current = danceAction;
         }
-        console.log('[Robot3DViewer] 跳舞');
         break;
         
       case 'reset':
@@ -442,11 +459,36 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         if (resetAction) {
           currentActionRef.current = resetAction;
         }
-        console.log('[Robot3DViewer] 重置');
+        break;
+      
+      // 外设控制专用命令
+      case 'Running':
+        // 快速奔跑
+        const peripheralRunAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Running', true);
+        if (peripheralRunAction) {
+          peripheralRunAction.timeScale = 1.5;
+          currentActionRef.current = peripheralRunAction;
+        }
+        break;
+        
+      case 'Walking':
+        // 行走
+        const peripheralWalkAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Walking', true);
+        if (peripheralWalkAction) {
+          peripheralWalkAction.timeScale = 1.0;
+          currentActionRef.current = peripheralWalkAction;
+        }
+        break;
+        
+      case 'Idle':
+        // 待机
+        const peripheralIdleAction = loader.playAnimation(mixerRef.current, animationsRef.current, 'Idle', true);
+        if (peripheralIdleAction) {
+          currentActionRef.current = peripheralIdleAction;
+        }
         break;
         
       default:
-        console.log('[Robot3DViewer] 未知指令:', currentCommand);
     }
   }, [currentCommand]);
 

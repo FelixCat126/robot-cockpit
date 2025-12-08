@@ -3,7 +3,8 @@
  * 0号屏（左侧）：登录控制屏，登录后显示机器人控制指令
  */
 
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useState, useEffect } from 'react';
+import websocketService from '../services/websocket';
 import { useAuthStore } from '../stores/authStore';
 import { ControlPanel } from '../components/shared/ControlPanel';
 import './Screen.css';
@@ -14,15 +15,42 @@ interface Screen0Props {
 }
 
 function Screen0({ screenId, onDeselectRobot }: Screen0Props) {
-  const { connected } = useWebSocket({
-    screenId,
-    topics: ['/robot/commands'],
-  });
+  const [connected, setConnected] = useState(false);
   const { logout } = useAuthStore();
+
+  useEffect(() => {
+    // 监听WebSocket连接状态
+    const handleConnected = () => {
+      setConnected(true);
+      console.log('[Screen0] WebSocket已连接');
+    };
+    
+    const handleDisconnected = () => {
+      setConnected(false);
+      console.log('[Screen0] WebSocket已断开');
+    };
+    
+    websocketService.on('connected', handleConnected);
+    websocketService.on('disconnected', handleDisconnected);
+    
+    // 检查初始状态
+    if (websocketService.getStatus().connected) {
+      setConnected(true);
+    }
+    
+    return () => {
+      websocketService.off('connected', handleConnected);
+      websocketService.off('disconnected', handleDisconnected);
+    };
+  }, []);
 
   const handleLogout = () => {
     console.log('[Screen0] Logout clicked');
     logout();
+  };
+
+  const publish = (topic: string, message: any, type?: string) => {
+    websocketService.publishTopic(topic, message, type);
   };
 
   return (
@@ -47,7 +75,13 @@ function Screen0({ screenId, onDeselectRobot }: Screen0Props) {
       </div>
 
       <div className="screen-content control-content">
-        <ControlPanel screenId={screenId} />
+        <ControlPanel 
+          screenId={screenId}
+          enablePeripherals={true}
+          showPeripheralDebug={false}
+          connected={connected}
+          publish={publish}
+        />
       </div>
     </div>
   );
