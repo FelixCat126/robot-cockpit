@@ -207,21 +207,30 @@ class RobotCockpitServer {
     const USE_MOCK = config.auth.useMock;
     const AUTH_API_URL = config.auth.apiUrl;
 
+    console.log('[Auth] 认证请求:', { username, password: '***', useMock: USE_MOCK });
+
     if (USE_MOCK) {
       // 模拟认证逻辑
       // 配置测试账号
       const MOCK_CREDENTIALS = {
-        admin: '123456',
-        user: 'user123',
-        test: 'test123',
+        'admin': '123456',
+        'user': 'user123',
+        'test': 'test123',
+        '13800138000@麦擎科技': '123456',  // 调试账号：手机号 + 验证码
       };
+
+      console.log('[Auth] 可用账号:', Object.keys(MOCK_CREDENTIALS));
+      console.log('[Auth] 输入用户名:', username, '(长度:', username.length, ')');
+      console.log('[Auth] 输入密码:', password, '(长度:', password.length, ')');
 
       // 检查是否是测试账号
       if (MOCK_CREDENTIALS[username] === password) {
+        console.log('[Auth] ✅ 认证成功');
         return { success: true };
       }
 
       // 认证失败
+      console.log('[Auth] ❌ 认证失败 - 用户名或密码不匹配');
         return { success: false, message: '用户名或密码错误' };
     } else {
       // 调用真实的远端认证API

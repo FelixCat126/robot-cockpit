@@ -173,8 +173,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       <div className="control-content">
         {commandCategories.map((category) => (
           <div key={category.title} className="command-category">
-            {!compact && <h2 className="category-title">{category.title}</h2>}
-            <div className="command-grid">
+            {!compact && <h2 className="category-title" style={{ fontSize: '14px', marginBottom: '8px' }}>{category.title}</h2>}
+            <div className="command-grid" style={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              gap: '8px', 
+              justifyContent: 'flex-start' 
+            }}>
               {category.commands.map((cmd) => {
                 const IconComponent = getIcon(cmd.id);
                 return (
@@ -184,17 +189,23 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     style={{
                       borderColor: cmd.color,
                       backgroundColor: selectedCommand === cmd.id ? cmd.color : 'transparent',
+                      minWidth: compact ? '45px' : '65px',
+                      minHeight: compact ? '45px' : '65px',
+                      maxWidth: compact ? '45px' : '75px',
+                      maxHeight: compact ? '45px' : '75px',
+                      padding: compact ? '6px' : '10px',
+                      flex: '0 0 calc(50% - 4px)'
                     }}
                     onClick={() => handleSendCommand(cmd.id)}
                     title={cmd.label}
                   >
                     <span className="command-icon">
                       <IconComponent 
-                        size={compact ? 24 : 36} 
+                        size={compact ? 18 : 24} 
                         color={selectedCommand === cmd.id ? 'white' : cmd.color} 
                       />
                     </span>
-                    {!compact && <span className="command-label">{cmd.label}</span>}
+                    {!compact && <span className="command-label" style={{ fontSize: '11px' }}>{cmd.label}</span>}
                   </button>
                 );
               })}

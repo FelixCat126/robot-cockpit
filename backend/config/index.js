@@ -47,7 +47,7 @@ const config = {
   // 显示模式配置
   display: {
     // 显示模式：'single' | 'multi'
-    mode: process.env.DISPLAY_MODE || 'single',
+    mode: process.env.DISPLAY_MODE || 'multi',
     
     // 单屏模式配置
     single: {
@@ -58,13 +58,17 @@ const config = {
     // 多屏模式配置
     multi: {
       count: parseInt(process.env.SCREEN_COUNT || '4', 10),
-      // 单显示器模式（用于测试）
-      singleDisplayMode: process.env.SINGLE_DISPLAY_MODE === 'true' || true,
-      // 单显示器模式下的窗口配置
+      // 混合显示器模式：笔记本+外接显示器
+      singleDisplayMode: process.env.SINGLE_DISPLAY_MODE === 'true',
+      // 笔记本屏幕宽度（自动检测或手动配置）
+      // 常见分辨率：MacBook Pro 13"=2560, 14"=3024, 16"=3456
+      laptopWidth: parseInt(process.env.LAPTOP_WIDTH || '0', 10), // 0 = 自动检测
+      // 外接显示器窗口配置（Screen 1、2、3 并排显示）
       singleDisplayWindow: {
-        width: 640,  // 每个窗口的宽度（1920/3）
+        width: 640,  // 每个窗口的宽度（1920/3 = 640）
         height: 1080, // 每个窗口的高度
         spacing: 0,   // 窗口之间的间距
+        gap: 0,      // 窗口间隙
       },
     },
   },
@@ -73,13 +77,16 @@ const config = {
   screen: {
     // 屏幕数量
     count: parseInt(process.env.SCREEN_COUNT || '4', 10),
-    // 单显示器模式
-    singleDisplayMode: process.env.SINGLE_DISPLAY_MODE === 'true' || true,
-    // 单显示器模式下的窗口配置
+    // 混合显示器模式：笔记本+外接显示器
+    singleDisplayMode: process.env.SINGLE_DISPLAY_MODE === 'true',
+    // 笔记本屏幕宽度（自动检测或手动配置）
+    laptopWidth: parseInt(process.env.LAPTOP_WIDTH || '0', 10), // 0 = 自动检测
+    // 外接显示器窗口配置（Screen 1、2、3 并排显示）
     singleDisplayWindow: {
       width: 640,
       height: 1080,
       spacing: 0,
+      gap: 0,
     },
     // 浏览器启动参数
     browser: {

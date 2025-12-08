@@ -145,19 +145,66 @@ class ScreenManager extends EventEmitter {
 
   /**
    * 创建默认屏幕配置（当检测失败时使用）
+   * macOS双显示器特殊配置：笔记本屏幕 + 外接显示器
    */
   createDefaultScreens() {
     this.log('warn', 'Creating default screen configurations');
     this.screens = [];
-    for (let i = 0; i < this.config.count; i++) {
+    
+    // macOS双显示器模式：Screen 0在笔记本，Screen 1-3在外接显示器
+    if (process.platform === 'darwin' && this.config.count === 4) {
+      // 获取笔记本实际宽度
+      let laptopWidth = this.config.laptopWidth || 0;
+      
+      if (laptopWidth === 0) {
+        // 使用常见的 MacBook Pro 分辨率作为默认值
+        // MacBook Pro 13" (M1/M2/M3): 2560
+        // MacBook Pro 14": 3024
+        // MacBook Pro 16": 3456
+        laptopWidth = 2560; // 最常见的 13" MacBook Pro 分辨率
+        this.log('info', `Using default laptop width: ${laptopWidth}px (可通过 LAPTOP_WIDTH 环境变量自定义)`);
+      } else {
+        this.log('info', `Using configured laptop width: ${laptopWidth}px`);
+      }
+      
+      // Screen 0: 笔记本屏幕全屏（宽度自适应）
       this.screens.push({
-        id: i,
-        name: `Default-Screen-${i}`,
-        width: 1920,
+        id: 0,
+        name: 'Laptop-Screen',
+        width: laptopWidth,
         height: 1080,
-        x: i * 1920,
+        x: 0,
         y: 0,
       });
+      
+      // Screen 1-3: 外接显示器，从左到右并排（每个640px宽）
+      const externalDisplayStartX = laptopWidth; // 从笔记本屏幕右侧开始
+      const windowWidth = 640; // 每个窗口宽度
+      
+      for (let i = 1; i < this.config.count; i++) {
+        this.screens.push({
+          id: i,
+          name: `External-Screen-${i}`,
+          width: windowWidth,
+          height: 1080,
+          x: externalDisplayStartX + (i - 1) * windowWidth,
+          y: 0,
+        });
+      }
+      
+      this.log('info', `macOS dual-display mode: Laptop(${laptopWidth}px) + External display (3x${windowWidth}px windows)`);
+    } else {
+      // 默认配置：所有屏幕横向排列
+      for (let i = 0; i < this.config.count; i++) {
+        this.screens.push({
+          id: i,
+          name: `Default-Screen-${i}`,
+          width: 1920,
+          height: 1080,
+          x: i * 1920,
+          y: 0,
+        });
+      }
     }
   }
 
@@ -330,12 +377,47 @@ class ScreenManager extends EventEmitter {
 
     this.log('info', `Starting browsers for ${this.config.count} screens...`);
 
-    const promises = [];
-    for (let i = 0; i < this.config.count; i++) {
-      promises.push(this.startScreen(i));
+    // macOS 双显示器模式：先启动 Screen 0 以检测实际屏幕宽度
+    if (process.platform === 'darwin' && this.config.singleDisplayMode && this.config.count === 4) {
+      // 第一步：启动 Screen 0
+      this.log('info', 'Step 1: Launching Screen 0 to detect actual screen width...');
+      await this.startScreen(0);
+      
+      // 第二步：从 Screen 0 检测实际笔记本宽度
+      try {
+        const screen0Info = this.browsers.get(0);
+        if (screen0Info && screen0Info.page) {
+          const actualWidth = await screen0Info.page.evaluate(() => window.screen.width);
+          this.log('info', `Detected actual screen width: ${actualWidth}px`);
+          
+          // 更新屏幕配置
+          const windowWidth = 640;
+          this.screens[1].x = actualWidth;
+          this.screens[2].x = actualWidth + windowWidth;
+          this.screens[3].x = actualWidth + windowWidth * 2;
+          
+          this.log('info', `Updated external display positions: ${this.screens[1].x}, ${this.screens[2].x}, ${this.screens[3].x}`);
+        }
+      } catch (e) {
+        this.log('warn', `Failed to detect screen width: ${e.message}, using default positions`);
+      }
+      
+      // 第三步：启动 Screen 1-3
+      this.log('info', 'Step 2: Launching Screen 1-3...');
+      const promises = [];
+      for (let i = 1; i < this.config.count; i++) {
+        promises.push(this.startScreen(i));
+      }
+      await Promise.all(promises);
+    } else {
+      // 默认模式：并行启动所有屏幕
+      const promises = [];
+      for (let i = 0; i < this.config.count; i++) {
+        promises.push(this.startScreen(i));
+      }
+      await Promise.all(promises);
     }
-
-    await Promise.all(promises);
+    
     this.log('info', 'All screens started');
     this.emit('all_screens_started', { count: this.config.count });
   }
@@ -375,21 +457,29 @@ class ScreenManager extends EventEmitter {
           arg !== '--kiosk' && arg !== '--start-fullscreen'
         );
         
-        // 设置窗口大小和位置（左右分布）
-        const windowConfig = this.config.singleDisplayWindow;
-        viewportConfig = {
-          width: windowConfig.width,
-          height: windowConfig.height,
-        };
-        
-        // 计算窗口位置：0号屏在左边，1号屏在右边
-        const windowX = screenId * windowConfig.width;
-        const windowY = 0;
-        
-        browserArgs.push(`--window-position=${windowX},${windowY}`);
-        browserArgs.push(`--window-size=${windowConfig.width},${windowConfig.height}`);
-        
-        this.log('info', `[Single Display] Window ${screenId} at (${windowX}, ${windowY}), size ${viewportConfig.width}x${viewportConfig.height}`);
+        // 对于 Screen 0（笔记本），不设置固定尺寸，为全屏做准备
+        // 对于 Screen 1-3（外接显示器），设置窗口模式的固定尺寸
+        if (screenId === 0) {
+          // Screen 0: 保持原始分辨率，不限制窗口大小
+          // 不添加 --window-size 参数，让全屏模式自适应
+          this.log('info', `[Dual Display] Screen 0 using auto-size for fullscreen`);
+        } else {
+          // Screen 1-3: 使用固定的窗口尺寸
+          const windowConfig = this.config.singleDisplayWindow;
+          viewportConfig = {
+            width: windowConfig.width,
+            height: windowConfig.height,
+          };
+          
+          // 使用从屏幕配置中获取的 X 坐标（已在 startAllScreens 中更新）
+          const windowX = screen.x;
+          const windowY = screen.y;
+          
+          browserArgs.push(`--window-position=${windowX},${windowY}`);
+          browserArgs.push(`--window-size=${windowConfig.width},${windowConfig.height}`);
+          
+          this.log('info', `[Dual Display] Window ${screenId} at (${windowX}, ${windowY}), size ${viewportConfig.width}x${viewportConfig.height}`);
+        }
       } else {
         // 多显示器模式：保留全屏参数，确保浏览器以全屏模式启动
         // 添加窗口位置参数（如果支持）
@@ -407,7 +497,8 @@ class ScreenManager extends EventEmitter {
         ...this.config.browser,
         args: browserArgs,
         ignoreDefaultArgs: ['--enable-automation'],  // 移除自动化标识
-        defaultViewport: viewportConfig,
+        // Screen 0 使用 null viewport 以允许全屏自适应，其他屏幕使用固定 viewport
+        defaultViewport: (screenId === 0 && isSingleDisplayMode) ? null : viewportConfig,
       };
 
       // 如果找到了系统Chrome，使用它
@@ -460,39 +551,50 @@ class ScreenManager extends EventEmitter {
       const page = await browser.newPage();
       
       // 设置视口大小
-      await page.setViewport(viewportConfig);
+      // Screen 0 在单显示器模式下跳过 setViewport，让全屏模式自适应
+      if (screenId === 0 && isSingleDisplayMode) {
+        this.log('info', `[Dual Display] Screen 0 skipping viewport setting for fullscreen auto-adapt`);
+        // 不调用 setViewport()，让浏览器使用默认（已设置 defaultViewport: null）
+      } else {
+        await page.setViewport(viewportConfig);
+      }
 
       // 根据模式设置窗口位置和大小
       if (isSingleDisplayMode) {
-        // 单显示器模式：多个窗口并排显示
+        // 单显示器模式或混合显示器模式：使用预定义的屏幕坐标
         try {
-          const windowConfig = this.config.singleDisplayWindow;
-          // 计算窗口位置（四宫格排列，2x2）
-          const colsPerRow = 2;
-          const col = screenId % colsPerRow;
-          const row = Math.floor(screenId / colsPerRow);
-          const windowX = col * (windowConfig.width + windowConfig.gap) + 50;
-          const windowY = row * (windowConfig.height + windowConfig.gap) + 50;
-          
-          // 使用CDP协议设置窗口位置
-          const client = await page.target().createCDPSession();
-          const windowId = await client.send('Browser.getWindowForTarget', {
-            targetId: page.target()._targetId
-          });
-          
-          try {
-            await client.send('Browser.setWindowBounds', {
-              windowId: windowId.windowId,
-              bounds: {
-                left: windowX,
-                top: windowY,
-                width: viewportConfig.width,
-                height: viewportConfig.height,
-              }
+          // 对于 Screen 0（笔记本），跳过固定尺寸设置，直接设置全屏
+          // 对于 Screen 1-3（外接显示器），设置固定尺寸
+          if (screenId !== 0) {
+            // 直接使用 createDefaultScreens() 中定义的坐标
+            const windowX = screen.x;
+            const windowY = screen.y;
+            const windowWidth = screen.width;
+            const windowHeight = screen.height;
+            
+            // 使用CDP协议设置窗口位置
+            const client = await page.target().createCDPSession();
+            const windowId = await client.send('Browser.getWindowForTarget', {
+              targetId: page.target()._targetId
             });
-            this.log('info', `[Single Display] Window ${screenId} positioned at (${windowX}, ${windowY})`);
-          } catch (e) {
-            this.log('warn', `Could not set window position for screen ${screenId}: ${e.message}`);
+            
+            try {
+              await client.send('Browser.setWindowBounds', {
+                windowId: windowId.windowId,
+                bounds: {
+                  left: windowX,
+                  top: windowY,
+                  width: windowWidth,
+                  height: windowHeight,
+                }
+              });
+              this.log('info', `[Dual Display] Window ${screenId} positioned at (${windowX}, ${windowY}), size ${windowWidth}x${windowHeight}`);
+            } catch (e) {
+              this.log('warn', `Could not set window position for screen ${screenId}: ${e.message}`);
+            }
+          } else {
+            // Screen 0: 不设置固定尺寸，等待后面设置全屏
+            this.log('info', `[Dual Display] Screen 0 will be set to fullscreen (skipping fixed size)`);
           }
         } catch (e) {
           this.log('warn', `CDP session failed for screen ${screenId}: ${e.message}`);
@@ -586,8 +688,30 @@ class ScreenManager extends EventEmitter {
 
       // 根据模式决定是否请求全屏
       if (isSingleDisplayMode) {
-        // 单显示器模式：不请求全屏，保持窗口模式
-        this.log('info', `[Single Display] Screen ${screenId} running in window mode`);
+        // 混合显示器模式：Screen 0 全屏（笔记本），Screen 1-3 窗口模式（外接显示器）
+        if (screenId === 0) {
+          try {
+            // 使用 CDP 设置窗口为最大化+全屏状态（无提示，占满屏幕）
+            const client = await page.target().createCDPSession();
+            const windowId = await client.send('Browser.getWindowForTarget', {
+              targetId: page.target()._targetId
+            });
+            
+            // 先最大化窗口
+            await client.send('Browser.setWindowBounds', {
+              windowId: windowId.windowId,
+              bounds: {
+                windowState: 'fullscreen',  // 直接设置为 fullscreen 状态，无 ESC 提示
+              }
+            });
+            
+            this.log('info', `[Dual Display] Screen ${screenId} set to fullscreen mode (laptop, no ESC prompt)`);
+          } catch (e) {
+            this.log('warn', `Could not set fullscreen for screen ${screenId}: ${e.message}`);
+          }
+        } else {
+          this.log('info', `[Dual Display] Screen ${screenId} running in window mode (external display)`);
+        }
       } else {
         // 多显示器模式：请求全屏
         try {

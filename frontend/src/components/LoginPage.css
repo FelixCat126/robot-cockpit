@@ -101,7 +101,7 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
-.username-input {
+.phone-input {
   flex: 1;
   padding: 15px;
   font-size: 16px;
@@ -112,14 +112,78 @@
   min-width: 0;
 }
 
-.username-input::placeholder {
+.phone-input::placeholder {
   color: rgba(255, 255, 255, 0.6);
 }
 
-.username-input:focus {
+.phone-input:focus {
   outline: none;
   border: none !important;
   background: transparent !important;
+}
+
+/* 验证码输入组 */
+.code-input-group {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.code-input {
+  flex: 1;
+  padding: 15px;
+  font-size: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.code-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.code-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.get-code-btn {
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #667eea;
+  background: #ffffff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.get-code-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.get-code-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.get-code-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 输入提示 */
+.input-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: -4px;
+  padding-left: 4px;
 }
 
 .input-suffix {

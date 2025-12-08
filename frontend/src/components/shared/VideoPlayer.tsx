@@ -28,6 +28,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [useSimulation, setUseSimulation] = useState(false);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
   const [cameraInfo, setCameraInfo] = useState({
     width: 1920,
@@ -224,12 +225,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // 组件挂载时初始化 - 使用 useLayoutEffect 确保 refs 已绑定
   useLayoutEffect(() => {
-    initializeVideo();
+    if (isVideoEnabled) {
+      initializeVideo();
+    }
     
     return () => {
       cleanupResources();
     };
-  }, [initializeVideo, cleanupResources]);
+  }, [isVideoEnabled, initializeVideo, cleanupResources]);
 
   // 时钟更新
   useEffect(() => {
@@ -289,6 +292,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
+  // 切换视频流开启/关闭
+  const handleToggleVideo = () => {
+    if (isVideoEnabled) {
+      // 关闭视频流
+      cleanupResources();
+      setIsVideoEnabled(false);
+      setIsVideoLoading(false);
+      setVideoError(null);
+    } else {
+      // 开启视频流
+      setIsVideoEnabled(true);
+      initializeVideo();
+    }
+  };
+
   return (
     <div className={`video-player ${compact ? 'compact' : ''} ${className}`}>
       <div className="video-container" style={{ position: 'relative' }}>
@@ -303,7 +321,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            display: isVideoLoading || videoError ? 'none' : 'block'
+            display: isVideoLoading || videoError || !isVideoEnabled ? 'none' : 'block'
           }}
         />
         <canvas 
@@ -312,7 +330,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
         
         {/* 视频叠加层 - 仅在正常播放时显示 */}
-        {!isVideoLoading && !videoError && (
+        {!isVideoLoading && !videoError && isVideoEnabled && (
           <div className="video-overlay">
             <div className="overlay-info">
               <span className="live-badge">🔴 LIVE</span>
@@ -343,7 +361,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
         
         {/* 错误状态覆盖层 */}
-        {videoError && (
+        {videoError && isVideoEnabled && (
           <div className="video-placeholder error" style={{
             position: 'absolute',
             top: 0,
@@ -365,37 +383,190 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
           </div>
         )}
+        
+        {/* 视频已关闭覆盖层 */}
+        {!isVideoEnabled && (
+          <div className="video-placeholder disabled" style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#0f172a',
+            zIndex: 10
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="placeholder-icon">📴</div>
+              <p className="placeholder-title">视频流已关闭</p>
+              <p style={{ 
+                fontSize: '14px', 
+                color: '#64748b', 
+                marginTop: '10px',
+                marginBottom: '20px'
+              }}>
+                点击下方按钮重新开启视频流
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {showControls && !isVideoLoading && !videoError && (
-        <div className="video-controls">
+      {showControls && !isVideoLoading && (
+        <div className="video-controls" style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          justifyContent: 'center', 
+          padding: '10px',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)'
+        }}>
+          {/* 视频启用时显示的控制按钮 */}
+          {isVideoEnabled && !videoError && (
+            <>
+              <button 
+                className="control-btn" 
+                onClick={handlePlayPause}
+                title={isPaused ? '播放' : '暂停'}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '0',
+                  fontSize: '18px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+              >
+                {isPaused ? '▶️' : '⏸️'}
+              </button>
+              <button 
+                className="control-btn" 
+                onClick={handleScreenshot}
+                title="截图"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '0',
+                  fontSize: '18px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+              >
+                📸
+              </button>
+              <button 
+                className="control-btn" 
+                onClick={handleFullscreen}
+                title="全屏"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '0',
+                  fontSize: '18px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+              >
+                ⛶
+              </button>
+              <button 
+                className="control-btn" 
+                onClick={initializeVideo}
+                title="刷新"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  padding: '0',
+                  fontSize: '18px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+              >
+                🔄
+              </button>
+            </>
+          )}
+          
+          {/* 关闭/开启视频流按钮 - 始终显示 */}
           <button 
-            className="control-btn" 
-            onClick={handlePlayPause}
-            title={isPaused ? '播放' : '暂停'}
+            className={`control-btn ${!isVideoEnabled ? 'highlight' : ''}`}
+            onClick={handleToggleVideo}
+            title={isVideoEnabled ? '关闭视频流' : '开启视频流'}
+            style={{
+              width: '40px',
+              height: '40px',
+              minWidth: '40px',
+              minHeight: '40px',
+              padding: '0',
+              fontSize: '18px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '6px',
+              backgroundColor: !isVideoEnabled ? '#10b981' : 'rgba(255,255,255,0.1)',
+              color: 'white',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              marginLeft: isVideoEnabled ? '10px' : '0'
+            }}
+            onMouseOver={(e) => {
+              if (isVideoEnabled) {
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (isVideoEnabled) {
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+              }
+            }}
           >
-            {isPaused ? '▶️' : '⏸️'}
-          </button>
-          <button 
-            className="control-btn" 
-            onClick={handleScreenshot}
-            title="截图"
-          >
-            📸
-          </button>
-          <button 
-            className="control-btn" 
-            onClick={handleFullscreen}
-            title="全屏"
-          >
-            ⛶
-          </button>
-          <button 
-            className="control-btn" 
-            onClick={initializeVideo}
-            title="刷新"
-          >
-            🔄
+            {isVideoEnabled ? '📴' : '📹'}
           </button>
         </div>
       )}
