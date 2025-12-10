@@ -391,7 +391,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
         <canvas 
           ref={canvasRef} 
-          style={{ display: 'none' }}
+          style={{ 
+            display: useSimulation ? 'block' : 'none',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '1px',
+            height: '1px',
+            opacity: 0,
+            pointerEvents: 'none',
+            zIndex: -1
+          }}
         />
         
         {/* 视频叠加层 - 始终显示 */}

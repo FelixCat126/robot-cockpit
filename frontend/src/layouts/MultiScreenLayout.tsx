@@ -119,6 +119,7 @@ export const MultiScreenLayout: React.FC = () => {
     };
 
     const handleRobotDeselected = () => {
+      console.log('[MultiScreenLayout] Robot deselected, clearing state for screen:', screenId);
       setSelectedRobotId(null);
       localStorage.removeItem('robot_cockpit_selected_robot');
       localStorage.removeItem('robot_cockpit_robot_updated');
@@ -167,9 +168,12 @@ export const MultiScreenLayout: React.FC = () => {
   };
 
   const handleDeselectRobot = () => {
+    console.log('[MultiScreenLayout] Deselecting robot from screen:', screenId);
+    
     // 断开当前机器人连接
     communicationFactory.disconnectRobot();
     
+    // 先更新本地状态
     setSelectedRobotId(null);
     localStorage.removeItem('robot_cockpit_selected_robot');
     localStorage.removeItem('robot_cockpit_robot_updated');
@@ -179,6 +183,8 @@ export const MultiScreenLayout: React.FC = () => {
     
     // 触发自定义事件，通知同窗口内的其他组件（备用机制）
     window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
+    
+    console.log('[MultiScreenLayout] Robot deselected, state cleared');
   };
 
   const renderScreen = () => {
