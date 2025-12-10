@@ -63,10 +63,22 @@ class CommunicationFactory {
   /**
    * 为指定机器人创建连接
    * 自动根据机器人配置选择通信方式
+   * 
+   * TODO: 临时跳过实际连接，待远端机器人就绪后启用
    */
   async connectToRobot(robotId: string, preferredMode?: CommunicationMode): Promise<void> {
     console.log(`[CommunicationFactory] Connecting to robot: ${robotId}`);
 
+    // ========== 临时方案：跳过实际连接 ==========
+    // TODO: 远端机器人就绪后，删除此段代码，启用下方的完整连接流程
+    console.log(`[CommunicationFactory] [DEV MODE] Skipping actual connection, robot selected: ${robotId}`);
+    this.currentRobotId = robotId;
+    this.currentMode = 'websocket'; // 默认标记为 websocket 模式
+    return;
+    // ========== 临时方案结束 ==========
+
+    // ========== 完整连接流程（暂时禁用）==========
+    // eslint-disable-next-line no-unreachable
     try {
       // 1. 获取机器人配置（优先从云端获取）
       let robotConfig = await fetchRobotConfigFromCloud(robotId);
@@ -107,6 +119,7 @@ class CommunicationFactory {
       console.error('[CommunicationFactory] Failed to connect to robot:', error);
       throw error;
     }
+    // ========== 完整连接流程结束 ==========
   }
 
   /**

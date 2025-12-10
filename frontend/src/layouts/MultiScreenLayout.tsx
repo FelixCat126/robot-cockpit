@@ -122,6 +122,7 @@ export const MultiScreenLayout: React.FC = () => {
       localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
       
       // 使用通信工厂连接到机器人（自动选择 WebSocket 或 WebRTC）
+      // TODO: 临时跳过实际连接，待远端机器人就绪后正常连接
       await communicationFactory.connectToRobot(robotId);
       
       // 同时保持 WebSocket 连接用于多屏同步
@@ -130,9 +131,11 @@ export const MultiScreenLayout: React.FC = () => {
       console.log(`[MultiScreenLayout] Connected to robot: ${robotId} via ${communicationFactory.getCurrentMode()}`);
     } catch (error) {
       console.error('[MultiScreenLayout] Failed to connect to robot:', error);
-      // 连接失败，清除选择
-      setSelectedRobotId(null);
-      localStorage.removeItem('robot_cockpit_selected_robot');
+      // TODO: 临时禁用错误处理，允许进入界面
+      console.warn('[MultiScreenLayout] Connection failed, but allowing UI access for development');
+      // 连接失败也允许进入（开发阶段）
+      // setSelectedRobotId(null);
+      // localStorage.removeItem('robot_cockpit_selected_robot');
     }
   };
 
