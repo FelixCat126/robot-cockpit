@@ -100,17 +100,18 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         
         // 前后速度：前推为正，后拉为负
         // 注意：Gamepad API中，Y轴向下为正，所以需要取反
-        const linearX = Math.abs(leftStickY) > deadzone ? -leftStickY * 1.0 : 0; // 速度系数从0.5增加到1.0
+        // 左摇杆Y轴（axisIndex 1）→ 前后移动
+        const linearX = Math.abs(leftStickY) > deadzone ? -leftStickY * 0.5 : 0; // 与InputMapper保持一致：0.5速度系数
         
-        // 左右速度：右推为正，左推为负（侧向移动）
-        const linearY = Math.abs(leftStickX) > deadzone ? leftStickX * 1.0 : 0; // 速度系数从0.5增加到1.0
+        // 转向速度：左摇杆X轴（axisIndex 0）→ 转向
+        // 与单屏模式保持一致：X轴控制转向，不是左右位移
+        const angularZ = Math.abs(leftStickX) > deadzone ? leftStickX * 1.0 : 0; // 与InputMapper保持一致：1.0转向速度
         
-        // 转向速度：街机摇杆通常没有右摇杆，使用左摇杆X轴控制转向
-        // 但为了不冲突，如果同时有左右移动和转向，优先使用左右移动
-        const angularZ = 0; // 街机摇杆通常不支持转向，需要单独按钮
+        // 左右速度：不使用linearY（与单屏模式一致）
+        const linearY = 0; // 单屏模式不使用左右位移，只使用前后+转向
         
-        // 判断是否有实际输入
-        const hasInput = Math.abs(linearX) > 0.01 || Math.abs(linearY) > 0.01 || Math.abs(angularZ) > 0.01;
+        // 判断是否有实际输入（与单屏模式一致）
+        const hasInput = Math.abs(linearX) > 0.01 || Math.abs(angularZ) > 0.01;
         
         // 立即更新Zustand store（不节流，确保松开时立即停止）
         setMoveVelocityRef.current({
@@ -124,8 +125,8 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           lastSendTimeRef.current = now;
           
           
-          // 根据线速度和角速度决定动画（考虑多向运动）
-          const totalSpeed = Math.sqrt(linearX * linearX + linearY * linearY + angularZ * angularZ);
+          // 根据线速度和角速度决定动画（与单屏模式一致）
+          const totalSpeed = Math.sqrt(linearX * linearX + angularZ * angularZ);
           
           let targetAnimation = 'Idle';
           
@@ -148,12 +149,12 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
             publishRef.current('robot_3d_command', { command: targetAnimation, timestamp: Date.now() }, 'std_msgs/String');
           }
           
-          // 发送实时移动控制命令（用于URDF模型的位置控制，支持多向运动）
+          // 发送实时移动控制命令（用于URDF模型的位置控制，与单屏模式一致）
           // 无论是否有输入，都要发送移动数据（包括停止命令）
             const moveCommand = {
               command: 'move',
               linearX: linearX,
-            linearY: linearY,
+              linearY: 0, // 单屏模式不使用左右位移
               angularZ: angularZ,
               timestamp: Date.now()
             };
