@@ -13,7 +13,12 @@ class WebRTCService implements ICommunicationService {
   private config: WebRTCConfig;
   private eventCallbacks: Map<string, Function[]> = new Map();
   private isConnectedFlag: boolean = false;
-  private videoElement: HTMLVideoElement | null = null;
+  private videoElements: Map<string, HTMLVideoElement> = new Map(); // 支持多路视频
+  private audioElements: Map<string, HTMLAudioElement> = new Map(); // 支持多路音频
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 10;
+  private pendingMessages: any[] = []; // 队列待发送的消息
 
   constructor(config?: Partial<WebRTCConfig>) {
     this.config = {
@@ -41,11 +46,22 @@ class WebRTCService implements ICommunicationService {
   disconnect(): void {
     console.log('[WebRTC] Disconnecting...');
     
+    // 清除重连定时器
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
     this.dataChannel?.close();
     this.pc?.close();
     this.signalingSocket?.disconnect();
     
+    // 清理视频和音频元素
+    this.videoElements.clear();
+    this.audioElements.clear();
+    
     this.isConnectedFlag = false;
+    this.reconnectAttempts = 0;
     this.emit('disconnected');
   }
 
@@ -137,9 +153,26 @@ class WebRTCService implements ICommunicationService {
 
   // ========== 视频流管理 ==========
 
-  attachVideoElement(videoElement: HTMLVideoElement): void {
-    this.videoElement = videoElement;
-    console.log('[WebRTC] Video element attached');
+  attachVideoElement(videoElement: HTMLVideoElement, streamId: string = 'default'): void {
+    this.videoElements.set(streamId, videoElement);
+    console.log(`[WebRTC] Video element attached: ${streamId}`);
+  }
+
+  detachVideoElement(streamId: string = 'default'): void {
+    this.videoElements.delete(streamId);
+    console.log(`[WebRTC] Video element detached: ${streamId}`);
+  }
+
+  // ========== 音频流管理 ==========
+
+  attachAudioElement(audioElement: HTMLAudioElement, streamId: string = 'default'): void {
+    this.audioElements.set(streamId, audioElement);
+    console.log(`[WebRTC] Audio element attached: ${streamId}`);
+  }
+
+  detachAudioElement(streamId: string = 'default'): void {
+    this.audioElements.delete(streamId);
+    console.log(`[WebRTC] Audio element detached: ${streamId}`);
   }
 
   async getStats(): Promise<any> {
@@ -200,6 +233,9 @@ class WebRTCService implements ICommunicationService {
       console.log('[WebRTC] Signaling disconnected');
       this.isConnectedFlag = false;
       this.emit('disconnected');
+      
+      // 尝试重连
+      this.attemptReconnect();
     });
 
     this.signalingSocket.on('error', (error: any) => {
@@ -246,14 +282,31 @@ class WebRTCService implements ICommunicationService {
       console.log('[WebRTC] ICE connection state:', this.pc?.iceConnectionState);
     };
 
-    // 接收远端视频流
+    // 接收远端视频流和音频流
     this.pc.ontrack = (event) => {
-      console.log('[WebRTC] Received remote track:', event.track.kind);
+      console.log('[WebRTC] Received remote track:', event.track.kind, 'streamId:', event.streams[0]?.id);
       
-      if (this.videoElement && event.streams[0]) {
-        this.videoElement.srcObject = event.streams[0];
-        console.log('[WebRTC] Video stream attached to element');
-        this.emit('video_stream', event.streams[0]);
+      if (event.streams[0]) {
+        const stream = event.streams[0];
+        const streamId = stream.id;
+        
+        if (event.track.kind === 'video') {
+          // 视频流
+          const videoElement = this.videoElements.get('default') || this.videoElements.get(streamId);
+          if (videoElement) {
+            videoElement.srcObject = stream;
+            console.log('[WebRTC] Video stream attached to element');
+          }
+          this.emit('video_stream', { stream, streamId, track: event.track });
+        } else if (event.track.kind === 'audio') {
+          // 音频流
+          const audioElement = this.audioElements.get('default') || this.audioElements.get(streamId);
+          if (audioElement) {
+            audioElement.srcObject = stream;
+            console.log('[WebRTC] Audio stream attached to element');
+          }
+          this.emit('audio_stream', { stream, streamId, track: event.track });
+        }
       }
     };
 
@@ -344,10 +397,96 @@ class WebRTCService implements ICommunicationService {
     if (this.dataChannel?.readyState === 'open') {
       try {
         this.dataChannel.send(JSON.stringify(message));
+        // 发送成功后清理队列
+        this.flushPendingMessages();
       } catch (error) {
         console.error('[WebRTC] Failed to send via DataChannel:', error);
       }
+    } else {
+      // DataChannel 未就绪，加入队列
+      console.warn('[WebRTC] DataChannel not ready, queueing message');
+      this.pendingMessages.push(message);
     }
+  }
+
+  // ========== 私有方法：重连和队列管理 ==========
+
+  /**
+   * 尝试重新连接
+   */
+  private attemptReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('[WebRTC] Max reconnect attempts reached');
+      this.emit('error', new Error('Max reconnect attempts reached'));
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
+    
+    console.log(`[WebRTC] Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    
+    this.reconnectTimer = setTimeout(() => {
+      console.log('[WebRTC] Reconnecting...');
+      this.connect();
+    }, delay);
+  }
+
+  /**
+   * 刷新待发送消息队列
+   */
+  private flushPendingMessages(): void {
+    if (this.pendingMessages.length === 0) return;
+    
+    console.log(`[WebRTC] Flushing ${this.pendingMessages.length} pending messages`);
+    
+    while (this.pendingMessages.length > 0 && this.dataChannel?.readyState === 'open') {
+      const message = this.pendingMessages.shift();
+      try {
+        this.dataChannel.send(JSON.stringify(message));
+      } catch (error) {
+        console.error('[WebRTC] Failed to send pending message:', error);
+        // 重新加入队列
+        this.pendingMessages.unshift(message);
+        break;
+      }
+    }
+  }
+
+  // ========== 公共方法：配置管理 ==========
+
+  /**
+   * 更新配置（支持动态切换机器人）
+   */
+  updateConfig(config: Partial<WebRTCConfig>): void {
+    console.log('[WebRTC] Updating configuration:', config);
+    
+    const wasConnected = this.isConnectedFlag;
+    
+    // 如果正在连接，先断开
+    if (wasConnected) {
+      this.disconnect();
+    }
+    
+    // 更新配置
+    this.config = {
+      ...this.config,
+      ...config,
+    };
+    
+    // 如果之前已连接，重新连接
+    if (wasConnected) {
+      setTimeout(() => {
+        this.connect();
+      }, 1000);
+    }
+  }
+
+  /**
+   * 获取当前配置
+   */
+  getConfig(): WebRTCConfig {
+    return { ...this.config };
   }
 }
 

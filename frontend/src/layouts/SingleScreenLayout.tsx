@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import websocketService from '../services/websocket';
+import communicationFactory from '../services/communicationFactory';
 import remoteLogger from '../utils/remoteLogger';
 import LoginPage from '../components/LoginPage';
 import RobotList from '../components/RobotList';
@@ -173,11 +174,26 @@ export const SingleScreenLayout: React.FC = () => {
     };
   }, []);
 
-  const handleSelectRobot = (robotId: string) => {
-    setSelectedRobotId(robotId);
-    localStorage.setItem('robot_cockpit_selected_robot', robotId);
-    localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
-    websocketService.selectRobot(robotId);
+  const handleSelectRobot = async (robotId: string) => {
+    try {
+      setSelectedRobotId(robotId);
+      localStorage.setItem('robot_cockpit_selected_robot', robotId);
+      localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
+      
+      // 使用通信工厂连接到机器人（自动选择 WebSocket 或 WebRTC）
+      await communicationFactory.connectToRobot(robotId);
+      
+      // 同时保持 WebSocket 连接用于多屏同步
+      websocketService.selectRobot(robotId);
+      
+      console.log(`[SingleScreenLayout] Connected to robot: ${robotId} via ${communicationFactory.getCurrentMode()}`);
+    } catch (error) {
+      console.error('[SingleScreenLayout] Failed to connect to robot:', error);
+      alert(`连接机器人失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      // 连接失败，清除选择
+      setSelectedRobotId(null);
+      localStorage.removeItem('robot_cockpit_selected_robot');
+    }
   };
 
   const handleLogout = () => {
@@ -185,6 +201,9 @@ export const SingleScreenLayout: React.FC = () => {
   };
 
   const handleChangeRobot = () => {
+    // 断开当前机器人连接
+    communicationFactory.disconnectRobot();
+    
     setSelectedRobotId(null);
     localStorage.removeItem('robot_cockpit_selected_robot');
     localStorage.removeItem('robot_cockpit_robot_updated');
@@ -212,7 +231,7 @@ export const SingleScreenLayout: React.FC = () => {
             <span className="subtitle">机器人驾驶舱</span>
           </div>
           <span className="robot-info">
-            {selectedRobotId ? `控制中: ${selectedRobotId}` : '系统就绪'}
+            {selectedRobotId ? `控制中: ${selectedRobotId} (${communicationFactory.getCurrentMode().toUpperCase()})` : '系统就绪'}
           </span>
         </div>
         

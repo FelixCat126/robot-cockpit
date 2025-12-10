@@ -123,8 +123,8 @@ const config = {
 
   // WebRTC配置
   webrtc: {
-    // WebRTC功能开关（默认关闭，不影响现有功能）
-    enabled: process.env.WEBRTC_ENABLED === 'true',
+    // WebRTC功能开关（默认启用）
+    enabled: process.env.WEBRTC_ENABLED !== 'false',
     
     // 信令服务器URL（通常就是本地Express服务器）
     signalingUrl: process.env.SIGNALING_URL || 'ws://localhost:3000',

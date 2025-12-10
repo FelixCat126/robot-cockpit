@@ -14,6 +14,7 @@ const config = require('./config');
 const ROS2Bridge = require('./modules/ros2-bridge/ROS2Bridge');
 const WebSocketService = require('./modules/websocket/WebSocketService');
 const ScreenManager = require('./modules/screen-manager/ScreenManager');
+const WebRTCProxy = require('./modules/webrtc-proxy/WebRTCProxy');
 
 class RobotCockpitServer {
   constructor() {
@@ -29,6 +30,7 @@ class RobotCockpitServer {
     this.ros2Bridge = new ROS2Bridge(config.ros2Bridge);
     this.webSocketService = new WebSocketService(this.io);
     this.screenManager = new ScreenManager(config.screen);
+    this.webrtcProxy = new WebRTCProxy(config.webrtc);
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -95,6 +97,33 @@ class RobotCockpitServer {
       } catch (error) {
         console.error('[Debug API] Error logging frontend message:', error);
         res.status(500).json({ success: false, message: 'Log failed' });
+      }
+    });
+
+    // WebRTC机器人配置API
+    this.app.post('/api/webrtc/register-robot', (req, res) => {
+      try {
+        const { robotId, ip, port, protocol } = req.body;
+        
+        if (!robotId || !ip || !port) {
+          return res.status(400).json({
+            success: false,
+            message: '缺少必要参数: robotId, ip, port',
+          });
+        }
+        
+        this.webrtcProxy.registerRobot(robotId, { ip, port, protocol: protocol || 'http' });
+        
+        res.json({
+          success: true,
+          message: `Robot ${robotId} registered successfully`,
+        });
+      } catch (error) {
+        console.error('[WebRTC API] Register robot error:', error);
+        res.status(500).json({
+          success: false,
+          message: error.message,
+        });
       }
     });
 
@@ -282,7 +311,7 @@ class RobotCockpitServer {
 
   /**
    * 设置模块集成
-   * 连接ROS2 Bridge和WebSocket服务
+   * 连接ROS2 Bridge、WebSocket服务和WebRTC代理
    */
   setupModuleIntegration() {
     // ROS2 Bridge事件处理
@@ -331,6 +360,33 @@ class RobotCockpitServer {
     this.webSocketService.on('client_disconnected', ({ socketId }) => {
       console.log(`[Server] WebSocket client disconnected: ${socketId}`);
     });
+
+    // WebRTC代理事件处理（如果启用）
+    if (config.webrtc.enabled) {
+      console.log('[Server] WebRTC proxy enabled');
+      
+      // 监听WebRTC信令事件
+      this.webSocketService.on('webrtc_offer', async ({ socketId, robotId, offer }) => {
+        try {
+          console.log(`[Server] Forwarding WebRTC offer to robot: ${robotId}`);
+          const answer = await this.webrtcProxy.forwardOffer(robotId, offer);
+          this.webSocketService.sendToClient(socketId, 'answer', { sdp: answer });
+        } catch (error) {
+          console.error('[Server] Failed to forward offer:', error);
+          this.webSocketService.sendToClient(socketId, 'error', { 
+            message: `Failed to connect to robot: ${error.message}` 
+          });
+        }
+      });
+
+      this.webSocketService.on('webrtc_ice_candidate', async ({ robotId, candidate }) => {
+        try {
+          await this.webrtcProxy.forwardIceCandidate(robotId, candidate);
+        } catch (error) {
+          console.error('[Server] Failed to forward ICE candidate:', error);
+        }
+      });
+    }
   }
 
   /**

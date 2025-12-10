@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getScreenIdFromUrl } from '../utils/screenId';
 import { useAuthStore } from '../stores/authStore';
 import websocketService from '../services/websocket';
+import communicationFactory from '../services/communicationFactory';
 import remoteLogger from '../utils/remoteLogger';
 import LoginPage from '../components/LoginPage';
 import RobotList from '../components/RobotList';
@@ -114,14 +115,31 @@ export const MultiScreenLayout: React.FC = () => {
     };
   }, [screenId]);
 
-  const handleSelectRobot = (robotId: string) => {
-    setSelectedRobotId(robotId);
-    localStorage.setItem('robot_cockpit_selected_robot', robotId);
-    localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
-    websocketService.selectRobot(robotId);
+  const handleSelectRobot = async (robotId: string) => {
+    try {
+      setSelectedRobotId(robotId);
+      localStorage.setItem('robot_cockpit_selected_robot', robotId);
+      localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
+      
+      // 使用通信工厂连接到机器人（自动选择 WebSocket 或 WebRTC）
+      await communicationFactory.connectToRobot(robotId);
+      
+      // 同时保持 WebSocket 连接用于多屏同步
+      websocketService.selectRobot(robotId);
+      
+      console.log(`[MultiScreenLayout] Connected to robot: ${robotId} via ${communicationFactory.getCurrentMode()}`);
+    } catch (error) {
+      console.error('[MultiScreenLayout] Failed to connect to robot:', error);
+      // 连接失败，清除选择
+      setSelectedRobotId(null);
+      localStorage.removeItem('robot_cockpit_selected_robot');
+    }
   };
 
   const handleDeselectRobot = () => {
+    // 断开当前机器人连接
+    communicationFactory.disconnectRobot();
+    
     setSelectedRobotId(null);
     localStorage.removeItem('robot_cockpit_selected_robot');
     localStorage.removeItem('robot_cockpit_robot_updated');
