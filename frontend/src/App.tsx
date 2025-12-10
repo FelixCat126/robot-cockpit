@@ -6,11 +6,35 @@
 import { useState, useEffect } from 'react';
 import { MultiScreenLayout } from './layouts/MultiScreenLayout';
 import { SingleScreenLayout } from './layouts/SingleScreenLayout';
+import { CombinedScreenLayout } from './layouts/CombinedScreenLayout';
 import './App.css';
 
 function App() {
-  const [displayMode, setDisplayMode] = useState<'single' | 'multi' | null>(null);
+  const [displayMode, setDisplayMode] = useState<'single' | 'multi' | 'combined' | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
+
+  // 检测是否只有一块屏幕（多屏模式下的单屏组合布局）
+  const checkSingleDisplay = () => {
+    // 检查URL参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const combinedParam = urlParams.get('combined');
+    if (combinedParam === 'true') {
+      return true;
+    }
+    
+    // 检查是否有screen参数（如果有screen参数，说明是多屏模式，不使用组合布局）
+    const screenParam = urlParams.get('screen');
+    if (screenParam !== null) {
+      return false; // 有screen参数，使用真正的多屏模式
+    }
+    
+    // 多屏模式下，如果没有screen参数，默认使用组合布局（单屏显示所有内容）
+    if (displayMode === 'multi') {
+      return true;
+    }
+    
+    return false;
+  };
 
   // 运行时从后端获取显示模式配置
   useEffect(() => {
@@ -83,7 +107,17 @@ function App() {
   // MultiScreenLayout和SingleScreenLayout各自管理自己的状态和逻辑
   if (displayMode === 'single') {
     return <SingleScreenLayout />;
+  } else if (displayMode === 'multi') {
+    // 多屏模式：检查是否只有一块屏幕，如果是则使用组合布局
+    if (checkSingleDisplay()) {
+      return <CombinedScreenLayout />;
+    }
+    return <MultiScreenLayout />;
   } else {
+    // 默认：多屏模式
+    if (checkSingleDisplay()) {
+      return <CombinedScreenLayout />;
+    }
     return <MultiScreenLayout />;
   }
 }

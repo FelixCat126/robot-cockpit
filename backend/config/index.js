@@ -47,7 +47,7 @@ const config = {
   // 显示模式配置
   display: {
     // 显示模式：'single' | 'multi'
-    mode: process.env.DISPLAY_MODE || 'single',
+    mode: process.env.DISPLAY_MODE || 'multi',
     
     // 单屏模式配置
     single: {
