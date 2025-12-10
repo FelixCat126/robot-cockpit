@@ -108,6 +108,7 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         const angularZ = Math.abs(leftStickX) > deadzone ? leftStickX * 1.0 : 0; // 与InputMapper保持一致：1.0转向速度
         
         // 判断是否有实际输入（与单屏模式一致）
+        // 注意：不使用linearY（左右位移），只使用linearX（前后）和angularZ（转向）
         const hasInput = Math.abs(linearX) > 0.01 || Math.abs(angularZ) > 0.01;
         
         // 立即更新Zustand store（不节流，确保松开时立即停止）
