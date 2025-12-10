@@ -92,8 +92,8 @@ function RobotList({ onSelectRobot }: RobotListProps) {
   return (
     <div className="robot-list-container">
       <div className="robot-list-header">
-        <h1>选择机器人</h1>
-        <p className="subtitle">请选择要操作的机器人</p>
+        <h1>连接机器人</h1>
+        <p className="subtitle">请选择要连接的机器人</p>
       </div>
 
       <div className="robot-grid">
@@ -140,7 +140,7 @@ function RobotList({ onSelectRobot }: RobotListProps) {
                   handleSelectRobot(robot.id);
                 }}
               >
-                {robot.status === 'offline' ? '不可用' : selectedRobotId === robot.id ? '已选择' : '选择'}
+                {robot.status === 'offline' ? '不可用' : selectedRobotId === robot.id ? '已连接' : '连接'}
               </button>
             </div>
           </div>
