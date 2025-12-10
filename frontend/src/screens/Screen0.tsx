@@ -78,7 +78,6 @@ function Screen0({ screenId, onDeselectRobot }: Screen0Props) {
         <ControlPanel 
           screenId={screenId}
           enablePeripherals={true}
-          showPeripheralDebug={false}
           connected={connected}
           publish={publish}
         />

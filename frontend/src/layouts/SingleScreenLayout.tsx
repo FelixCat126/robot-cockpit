@@ -12,17 +12,20 @@ import RobotList from '../components/RobotList';
 import { ControlPanel } from '../components/shared/ControlPanel';
 import { VideoPlayer } from '../components/shared/VideoPlayer';
 import { AudioPlayer } from '../components/shared/AudioPlayer';
-import { StatusMonitor } from '../components/shared/StatusMonitor';
 import { Robot3DViewer } from '../components/shared/Robot3DViewer';
+import { SpeedGauge } from '../components/shared/SpeedGauge';
 import './SingleScreenLayout.css';
 
 export const SingleScreenLayout: React.FC = () => {
-  const { logout, checkAuth, isAuthenticated } = useAuthStore();
+  const { logout, checkAuth, isAuthenticated, username } = useAuthStore();
   const checkAuthRef = useRef(checkAuth);
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(() => {
     return localStorage.getItem('robot_cockpit_selected_robot') || null;
   });
   const [connected, setConnected] = useState(false);
+  
+  // 公司名称
+  const companyName = '麦擎科技';
   
   checkAuthRef.current = checkAuth;
 
@@ -32,10 +35,70 @@ export const SingleScreenLayout: React.FC = () => {
     
     // 检查初始认证状态
     checkAuthRef.current();
+    
+    // 窗口自动最大化（非全屏）
+    const maximizeWindow = () => {
+      // 获取屏幕可用尺寸（排除任务栏等）
+      const screenWidth = window.screen.availWidth;
+      const screenHeight = window.screen.availHeight;
+      
+      // 设置窗口大小和位置
+      try {
+        // 使用window.resizeTo和window.moveTo（需要浏览器允许）
+        // 注意：某些浏览器可能限制窗口大小调整，需要用户交互后才能调整
+        window.resizeTo(screenWidth, screenHeight);
+        window.moveTo(0, 0);
+        console.log(`[SingleScreenLayout] ✅ 窗口已最大化: ${screenWidth}x${screenHeight}`);
+      } catch (error) {
+        // 如果浏览器不允许，尝试使用window.innerWidth/innerHeight
+        console.log('[SingleScreenLayout] 无法直接调整窗口大小，使用CSS自适应');
+      }
+      
+      // 如果窗口大小没有变化，尝试多次调整（某些浏览器需要多次调用）
+      const checkAndRetry = () => {
+        const currentWidth = window.outerWidth || window.innerWidth;
+        const currentHeight = window.outerHeight || window.innerHeight;
+        
+        // 如果窗口大小明显小于屏幕大小，再次尝试
+        if (currentWidth < screenWidth * 0.9 || currentHeight < screenHeight * 0.9) {
+          try {
+            window.resizeTo(screenWidth, screenHeight);
+            window.moveTo(0, 0);
+            console.log(`[SingleScreenLayout] 🔄 重试窗口最大化: ${screenWidth}x${screenHeight}`);
+          } catch (e) {
+            // 忽略错误
+          }
+        }
+      };
+      
+      // 延迟检查并重试
+      setTimeout(checkAndRetry, 200);
+      setTimeout(checkAndRetry, 500);
+    };
+    
+    // 延迟执行，确保DOM已加载
+    setTimeout(maximizeWindow, 100);
+    
+    // 如果窗口已经加载完成，立即执行
+    if (document.readyState === 'complete') {
+      maximizeWindow();
+    } else {
+      window.addEventListener('load', maximizeWindow);
+    }
+    
+    // 监听窗口大小变化，确保布局自适应
+    const handleResize = () => {
+      // 触发重新布局
+      window.dispatchEvent(new Event('resize'));
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
   
-  // PIP视频功能（暂时隐藏，为未来第三视角预留）
-  const showPIP = false;
 
   useEffect(() => {
     websocketService.connect();
@@ -140,7 +203,10 @@ export const SingleScreenLayout: React.FC = () => {
       {/* 顶部导航栏 */}
       <header className="layout-header">
         <div className="header-left">
-          <h1>🤖 机器人驾驶舱</h1>
+          <div className="company-section">
+            <h1>{companyName}</h1>
+            <span className="subtitle">机器人驾驶舱</span>
+          </div>
           <span className="robot-info">
             {selectedRobotId ? `控制中: ${selectedRobotId}` : '系统就绪'}
           </span>
@@ -156,6 +222,10 @@ export const SingleScreenLayout: React.FC = () => {
         </div>
         
         <div className="header-actions">
+          <div className="user-info">
+            <span className="user-icon">👤</span>
+            <span className="username">{username || '用户'}</span>
+          </div>
           <button className="header-btn" onClick={handleChangeRobot}>
             🔄 更换机器人
           </button>
@@ -165,55 +235,88 @@ export const SingleScreenLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Grid主体 */}
-      <main className="layout-grid">
-        {/* 左上：控制面板（紧凑） */}
-        <section className="grid-control">
-          <ControlPanel 
-            compact={false}
-            screenId={0}
-            enablePeripherals={true}
-            showPeripheralDebug={false}
-            connected={connected}
-            publish={(topic, message, type) => websocketService.publishTopic(topic, message, type)}
-          />
+      {/* 新布局：上下分区 */}
+      <main className="layout-main">
+        {/* 上半部分：视频流区域 */}
+        <section className="view-section">
+          {/* 左侧：左臂视角 */}
+          <div className="view-left-arm">
+            <VideoPlayer compact={true} screenId={0} showControls={true} />
+          </div>
+          
+          {/* 中间：主控视频视角 */}
+          <div className="view-main">
+            <VideoPlayer compact={true} screenId={2} showControls={true} />
+          </div>
+          
+          {/* 右侧：右臂视角 */}
+          <div className="view-right-arm">
+            <VideoPlayer compact={true} screenId={1} showControls={true} />
+          </div>
         </section>
         
-        {/* 中间大区域：视频流 */}
-        <section className="grid-video">
-          <VideoPlayer compact={true} screenId={0} showControls={true} />
+        {/* 下半部分：控制区域（三列布局） */}
+        <section className="control-section">
+          {/* 左侧：控制按钮 */}
+          <div className="control-buttons">
+            <ControlPanel 
+              compact={false}
+              screenId={0}
+              enablePeripherals={true}
+              connected={connected}
+              publish={(topic, message, type) => websocketService.publishTopic(topic, message, type)}
+            />
+          </div>
           
-          {/* 3D机器人小窗口 */}
-          <div className="robot-3d-overlay">
+          {/* 中间：音频和仪表盘 - 整体用大画布包起来 */}
+          <div className="control-middle">
+            <div className="control-middle-canvas">
+              {/* 上面一行：音频控制 */}
+              <div className="control-audio-inline">
+                <AudioPlayer compact={true} screenId={0} enableMicrophone={true} />
+              </div>
+              
+              {/* 下面一行：速度仪表盘 */}
+              <div className="control-gauges">
+                <SpeedGauge 
+                  label="左臂速度" 
+                  value={35} 
+                  maxValue={100} 
+                  unit="rpm"
+                  color="#3b82f6"
+                  size={110}
+                />
+                <SpeedGauge 
+                  label="右臂速度" 
+                  value={42} 
+                  maxValue={100} 
+                  unit="rpm"
+                  color="#10b981"
+                  size={110}
+                />
+                <SpeedGauge 
+                  label="轮移动速度" 
+                  value={28} 
+                  maxValue={100} 
+                  unit="rpm"
+                  color="#f59e0b"
+                  size={110}
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* 右侧：3D机器人 */}
+          <div className="control-robot3d">
             <Robot3DViewer 
-              width={320}
-              height={180}
+              width={100}
+              height={100}
               enableAutoRotate={true}
-              showGrid={false}
+              showGrid={true}
               showAxes={false}
               backgroundColor="#1a1a2e"
             />
           </div>
-          
-          {/* 预留第三视角位置（PIP） */}
-          {showPIP && (
-            <div className="pip-video">
-              <div className="pip-placeholder">
-                <span>📹</span>
-                <p>第三视角</p>
-              </div>
-            </div>
-          )}
-        </section>
-        
-        {/* 右侧：状态监控（紧凑） */}
-        <section className="grid-status">
-          <StatusMonitor compact={true} screenId={0} />
-        </section>
-        
-        {/* 底部：音频可视化 */}
-        <section className="grid-audio">
-          <AudioPlayer compact={true} screenId={0} />
         </section>
       </main>
     </div>

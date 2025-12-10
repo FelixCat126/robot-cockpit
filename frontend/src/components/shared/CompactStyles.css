@@ -110,6 +110,203 @@
   font-size: 11px;
 }
 
+/* 视频叠加层控制条样式 - 常驻显示 */
+.video-overlay-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.5), transparent);
+  opacity: 1;
+  z-index: 15;
+  pointer-events: auto; /* 确保可以点击 */
+}
+
+/* 视频统计信息 - 横向显示在底部 */
+.video-stats-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.stat-item-inline {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.stat-item-inline .stat-label {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.stat-item-inline .stat-value {
+  color: #10b981;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.overlay-control-btn {
+  height: 32px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(5px);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  pointer-events: auto; /* 确保按钮可点击 */
+  flex-shrink: 0;
+}
+
+.overlay-control-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-control-btn.close-btn {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
+  margin-left: 12px;
+}
+
+.overlay-control-btn.close-btn:hover {
+  background: rgba(239, 68, 68, 0.5);
+}
+
+.overlay-control-btn.start-btn {
+  background: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.5);
+  margin-left: 12px;
+}
+
+.overlay-control-btn.start-btn:hover {
+  background: rgba(16, 185, 129, 0.5);
+}
+
+.overlay-control-btn.highlight {
+  background: rgba(16, 185, 129, 0.5);
+  border-color: rgba(16, 185, 129, 0.7);
+}
+
+.overlay-control-btn.highlight:hover {
+  background: rgba(16, 185, 129, 0.7);
+}
+
+/* ========== AudioPlayer 内联样式（一行显示，仿外设提示） ========== */
+.audio-player-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid #334155;
+  border-radius: 6px;
+  border-left: 3px solid #10b981;
+  animation: fadeIn 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.audio-inline-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #10b981;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.audio-inline-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 24px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.audio-bar-mini {
+  flex: 1;
+  background: linear-gradient(to top, #10b981, #34d399);
+  border-radius: 1px;
+  min-width: 2px;
+  transition: height 0.05s ease-out, opacity 0.1s ease-out;
+}
+
+.audio-inline-volume {
+  font-size: 12px;
+  font-weight: 600;
+  color: #10b981;
+  font-family: 'Courier New', monospace;
+  min-width: 45px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.audio-inline-controls {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.control-btn-mini {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  font-size: 14px;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  background: rgba(51, 65, 85, 0.3);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.control-btn-mini:hover {
+  background: rgba(51, 65, 85, 0.5);
+  transform: scale(1.05);
+}
+
+.control-btn-mini.active {
+  background: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.control-btn-mini.muted {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 /* ========== AudioPlayer 紧凑样式 ========== */
 .audio-player.compact {
   padding: 8px 12px;
@@ -140,6 +337,7 @@
 .audio-player.compact .audio-visualizer {
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 .audio-player.compact .audio-bars {
@@ -151,8 +349,83 @@
   min-width: 2px;
 }
 
+/* 音量指示器 */
+.audio-volume-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px);
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+}
+
+.audio-volume-indicator .volume-label {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.audio-volume-indicator .volume-value {
+  color: #10b981;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  min-width: 45px;
+  text-align: right;
+}
+
 .audio-player.compact .audio-info {
   display: none; /* 紧凑模式隐藏详细音频指标 */
+}
+
+/* 麦克风激活徽章 */
+.streaming-badge.mic-active {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+  animation: micPulse 2s infinite;
+}
+
+/* 播放激活徽章 */
+.streaming-badge.playback-active {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #10b981;
+  animation: playbackPulse 1.5s infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes playbackPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.control-btn.active {
+  background: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ========== StatusMonitor 紧凑样式 ========== */
@@ -346,6 +619,12 @@
   background: rgba(16, 185, 129, 0.2);
   border: 1px solid rgba(16, 185, 129, 0.5);
   color: #10b981;
+}
+
+.peripheral-controller-status .status-indicator.connecting {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  color: #3b82f6;
 }
 
 .peripheral-controller-status .status-indicator.error {

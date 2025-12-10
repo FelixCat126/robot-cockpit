@@ -11,6 +11,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  username: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   checkAuth: () => void;
@@ -20,6 +21,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: authService.isAuthenticated(),
   isLoading: false,
   error: null,
+  username: localStorage.getItem('robot_cockpit_username'),
 
   login: async (username: string, password: string) => {
     set({ isLoading: true, error: null });
@@ -28,7 +30,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const result = await authService.login({ username, password });
       
       if (result.success) {
-        set({ isAuthenticated: true, isLoading: false, error: null });
+        // 保存用户名
+        localStorage.setItem('robot_cockpit_username', username);
+        set({ isAuthenticated: true, isLoading: false, error: null, username });
         
         // 通过WebSocket发送认证状态变化（主要机制）
         // 后端会广播到所有客户端，包括其他窗口
@@ -63,11 +67,12 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     authService.logout();
-    set({ isAuthenticated: false, error: null });
+    set({ isAuthenticated: false, error: null, username: null });
     
-    // 清除机器人选择状态
+    // 清除机器人选择状态和用户名
     window.localStorage.removeItem('robot_cockpit_selected_robot');
     window.localStorage.removeItem('robot_cockpit_robot_updated');
+    window.localStorage.removeItem('robot_cockpit_username');
     
     // 通过WebSocket发送登出状态到后端，让后端广播到所有屏幕
     websocketService.logout();

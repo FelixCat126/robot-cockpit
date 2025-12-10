@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { formatNetworkSpeed } from '../../utils/formatNetworkSpeed';
 import './CompactStyles.css';
 
 interface VideoPlayerProps {
@@ -26,7 +27,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState<string | null>(null);
-  const [isPaused, setIsPaused] = useState(false);
   const [useSimulation, setUseSimulation] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
@@ -36,6 +36,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     fps: 30,
     deviceLabel: '初始化中...',
   });
+  
+  // 视频流统计信息
+  const [videoStats, setVideoStats] = useState({
+    bitrate: 0,
+    networkSpeed: 0,
+    frameCount: 0,
+  });
+  const lastStatsUpdateRef = useRef(Date.now());
+  const frameCountRef = useRef(0);
 
   // 清理资源
   const cleanupResources = useCallback(() => {
@@ -54,52 +63,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, []);
 
-  // 初始化真实摄像头
-  const initRealCamera = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 },
-        },
-        audio: false,
-      });
-
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-
-      const videoTrack = stream.getVideoTracks()[0];
-      const settings = videoTrack.getSettings();
-      
-      setCameraInfo({
-        width: settings.width || 1920,
-        height: settings.height || 1080,
-        fps: settings.frameRate || 30,
-        deviceLabel: videoTrack.label || '真实摄像头',
-      });
-
-      setUseSimulation(false);
-      setIsVideoLoading(false);
-      setVideoError(null);
-      
-      return true;
-    } catch (error) {
-      console.error('[VideoPlayer] 摄像头初始化失败:', error);
-      setVideoError('无法访问摄像头');
-      return false;
-    }
-  }, []);
-
   // 使用ref存储isPaused，避免drawSimulatedVideo重新创建
-  const isPausedRef = useRef(isPaused);
-  useEffect(() => {
-    isPausedRef.current = isPaused;
-  }, [isPaused]);
+  const isPausedRef = useRef(false);
 
   // 绘制模拟视频
   const drawSimulatedVideo = useCallback((
@@ -166,18 +131,115 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     draw();
   }, []); // 移除isPaused依赖，使用ref代替
 
+  // 主初始化 - 移除依赖,使用最新的函数引用
+  const initializeVideo = useCallback(async () => {
+    console.log('[VideoPlayer] 开始初始化视频流...');
+    setIsVideoLoading(true);
+    setVideoError(null);
+    
+    // 先清理现有资源
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    
+    if (streamRef.current) {
+      console.log('[VideoPlayer] 停止现有视频流轨道');
+      streamRef.current.getTracks().forEach(track => {
+        console.log(`[VideoPlayer] 停止轨道: ${track.kind}, ${track.label}`);
+        track.stop();
+      });
+      streamRef.current = null;
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      // 强制重置视频元素
+      videoRef.current.load();
+    }
+    
+    // 等待一小段时间确保资源完全释放
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // 尝试初始化真实摄像头
+    try {
+      console.log('[VideoPlayer] 请求摄像头访问...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+        },
+        audio: false,
+      });
+
+      console.log('[VideoPlayer] 摄像头访问成功,获得流:', stream.id);
+      streamRef.current = stream;
+    
+      if (videoRef.current) {
+        console.log('[VideoPlayer] 设置video元素srcObject');
+        videoRef.current.srcObject = stream;
+        
+        // 确保视频元素准备好
+        await new Promise<void>((resolve, reject) => {
+          if (!videoRef.current) {
+            reject(new Error('videoRef丢失'));
+            return;
+          }
+          
+          const video = videoRef.current;
+          
+          const onLoadedMetadata = () => {
+            console.log('[VideoPlayer] 视频元数据加载完成');
+            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            resolve();
+          };
+          
+          video.addEventListener('loadedmetadata', onLoadedMetadata);
+          
+          // 超时保护
+          setTimeout(() => {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            resolve(); // 即使超时也继续
+          }, 3000);
+        });
+        
+        console.log('[VideoPlayer] 开始播放视频');
+        await videoRef.current.play();
+        console.log('[VideoPlayer] 视频播放成功');
+      }
+
+      const videoTrack = stream.getVideoTracks()[0];
+      const settings = videoTrack.getSettings();
+      
+      console.log('[VideoPlayer] 摄像头设置:', settings);
+      
+      setCameraInfo({
+        width: settings.width || 1920,
+        height: settings.height || 1080,
+        fps: settings.frameRate || 30,
+        deviceLabel: videoTrack.label || '真实摄像头',
+      });
+
+      setUseSimulation(false);
+      setIsVideoLoading(false);
+      setVideoError(null);
+      console.log('[VideoPlayer] 真实摄像头初始化完成');
+    } catch (error: any) {
+      console.error('[VideoPlayer] 摄像头初始化失败,切换到模拟视频:', error);
+      console.error('[VideoPlayer] 错误详情:', error?.message, error?.name);
+
   // 初始化模拟视频
-  const initSimulatedVideo = useCallback(() => {
+      try {
+        console.log('[VideoPlayer] 开始初始化模拟视频');
     const canvas = canvasRef.current;
     if (!canvas) {
-      console.error('[VideoPlayer] 模拟视频初始化失败: canvasRef为null');
-      return false;
+          throw new Error('canvas元素未找到');
     }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      console.error('[VideoPlayer] 模拟视频初始化失败: 无法获取2D context');
-      return false;
+          throw new Error('无法获取canvas 2d context');
     }
 
     canvas.width = 1920;
@@ -185,12 +247,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const stream = canvas.captureStream(30);
     streamRef.current = stream;
+        console.log('[VideoPlayer] 模拟视频流创建成功:', stream.id);
 
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(e => {
-        console.error('[VideoPlayer] 模拟视频播放失败:', e);
-      });
+          await videoRef.current.play();
+          console.log('[VideoPlayer] 模拟视频播放成功');
     }
 
     drawSimulatedVideo(ctx, canvas.width, canvas.height);
@@ -205,23 +267,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setUseSimulation(true);
     setIsVideoLoading(false);
     setVideoError(null);
-    
-    return true;
-  }, [drawSimulatedVideo]);
-
-  // 主初始化
-  const initializeVideo = useCallback(async () => {
-    setIsVideoLoading(true);
-    setVideoError(null);
-    
-    cleanupResources();
-    
-    const cameraSuccess = await initRealCamera();
-    
-    if (!cameraSuccess) {
-      initSimulatedVideo();
+        console.log('[VideoPlayer] 模拟视频初始化完成');
+      } catch (simError: any) {
+        console.error('[VideoPlayer] 模拟视频初始化也失败:', simError);
+        setVideoError(`视频初始化失败: ${simError?.message || '未知错误'}`);
+        setIsVideoLoading(false);
+      }
     }
-  }, [cleanupResources, initRealCamera, initSimulatedVideo]);
+  }, [drawSimulatedVideo]);
 
   // 组件挂载时初始化 - 使用 useLayoutEffect 确保 refs 已绑定
   useLayoutEffect(() => {
@@ -232,7 +285,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       cleanupResources();
     };
-  }, [isVideoEnabled, initializeVideo, cleanupResources]);
+  }, [isVideoEnabled]); // 只依赖 isVideoEnabled
 
   // 时钟更新
   useEffect(() => {
@@ -243,54 +296,38 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // 播放/暂停
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPaused) {
-        videoRef.current.play();
-        setIsPaused(false);
-      } else {
-        videoRef.current.pause();
-        setIsPaused(true);
-      }
-    }
-  };
-
-  // 截图
-  const handleScreenshot = () => {
-    const canvas = document.createElement('canvas');
-    const video = videoRef.current;
+  // 视频统计信息更新（模拟）
+  useEffect(() => {
+    if (!isVideoEnabled || isVideoLoading || videoError) return;
     
-    if (!video) return;
-
-    canvas.width = video.videoWidth || 1920;
-    canvas.height = video.videoHeight || 1080;
-
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0);
+    const statsTimer = setInterval(() => {
+      frameCountRef.current++;
       
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `robot-camera-${Date.now()}.png`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }
-      });
-    }
-  };
-
-  // 全屏
-  const handleFullscreen = () => {
-    if (videoRef.current) {
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
+      // 模拟码率和网速计算
+      const now = Date.now();
+      const elapsed = (now - lastStatsUpdateRef.current) / 1000;
+      
+      if (elapsed >= 1) {
+        const fps = cameraInfo.fps || 30;
+        const resolution = cameraInfo.width * cameraInfo.height;
+        // 估算码率（基于分辨率和帧率）
+        const estimatedBitrate = (resolution * fps * 0.15) / 1000; // kbps
+        // 模拟网速变化
+        const networkSpeed = estimatedBitrate * (0.9 + Math.random() * 0.2);
+        
+        setVideoStats({
+          bitrate: Math.round(estimatedBitrate),
+          networkSpeed: Math.round(networkSpeed),
+          frameCount: frameCountRef.current,
+        });
+        
+        lastStatsUpdateRef.current = now;
       }
-    }
-  };
+    }, 100);
+    
+    return () => clearInterval(statsTimer);
+  }, [isVideoEnabled, isVideoLoading, videoError, cameraInfo]);
+
 
   // 切换视频流开启/关闭
   const handleToggleVideo = () => {
@@ -329,15 +366,46 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           style={{ display: 'none' }}
         />
         
-        {/* 视频叠加层 - 仅在正常播放时显示 */}
-        {!isVideoLoading && !videoError && isVideoEnabled && (
-          <div className="video-overlay">
+        {/* 视频叠加层 - 始终显示 */}
+        <div className="video-overlay">
+          {/* 仅在视频播放时显示顶部信息 */}
+          {!isVideoLoading && !videoError && isVideoEnabled && (
             <div className="overlay-info">
               <span className="live-badge">🔴 LIVE</span>
               <span className="timestamp">{currentTime}</span>
             </div>
-          </div>
-        )}
+          )}
+          
+          {/* 底部控制条 - 始终显示，包含统计信息和开关按钮 */}
+          {showControls && (
+            <div className="video-overlay-controls">
+              {/* 视频统计信息 - 仅在视频播放时显示 */}
+              {!isVideoLoading && !videoError && isVideoEnabled && (
+                <div className="video-stats-inline">
+                  <span className="stat-item-inline">
+                    <span className="stat-label">网速</span>
+                    <span className="stat-value">{formatNetworkSpeed(videoStats.networkSpeed)}</span>
+                  </span>
+                  <span className="stat-item-inline">
+                    <span className="stat-label">帧率</span>
+                    <span className="stat-value">{cameraInfo.fps}fps</span>
+                  </span>
+                </div>
+              )}
+              
+              {/* 占位符，保持按钮在右边 */}
+              {(isVideoLoading || videoError || !isVideoEnabled) && <div style={{ flex: 1 }} />}
+              
+              <button 
+                className={`overlay-control-btn ${isVideoEnabled ? 'close-btn' : 'start-btn'}`}
+                onClick={handleToggleVideo}
+                title={isVideoEnabled ? "关闭视频流" : "开启视频流"}
+              >
+                {isVideoEnabled ? '📴' : '📹'}
+              </button>
+            </div>
+          )}
+        </div>
         
         {/* 加载状态覆盖层 */}
         {isVideoLoading && (
@@ -414,162 +482,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
       </div>
 
-      {showControls && !isVideoLoading && (
-        <div className="video-controls" style={{ 
-          display: 'flex', 
-          gap: '8px', 
-          justifyContent: 'center', 
-          padding: '10px',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)'
-        }}>
-          {/* 视频启用时显示的控制按钮 */}
-          {isVideoEnabled && !videoError && (
-            <>
-              <button 
-                className="control-btn" 
-                onClick={handlePlayPause}
-                title={isPaused ? '播放' : '暂停'}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '0',
-                  fontSize: '18px',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-              >
-                {isPaused ? '▶️' : '⏸️'}
-              </button>
-              <button 
-                className="control-btn" 
-                onClick={handleScreenshot}
-                title="截图"
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '0',
-                  fontSize: '18px',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-              >
-                📸
-              </button>
-              <button 
-                className="control-btn" 
-                onClick={handleFullscreen}
-                title="全屏"
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '0',
-                  fontSize: '18px',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-              >
-                ⛶
-              </button>
-              <button 
-                className="control-btn" 
-                onClick={initializeVideo}
-                title="刷新"
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  padding: '0',
-                  fontSize: '18px',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-              >
-                🔄
-              </button>
-            </>
-          )}
-          
-          {/* 关闭/开启视频流按钮 - 始终显示 */}
-          <button 
-            className={`control-btn ${!isVideoEnabled ? 'highlight' : ''}`}
-            onClick={handleToggleVideo}
-            title={isVideoEnabled ? '关闭视频流' : '开启视频流'}
-            style={{
-              width: '40px',
-              height: '40px',
-              minWidth: '40px',
-              minHeight: '40px',
-              padding: '0',
-              fontSize: '18px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '6px',
-              backgroundColor: !isVideoEnabled ? '#10b981' : 'rgba(255,255,255,0.1)',
-              color: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              marginLeft: isVideoEnabled ? '10px' : '0'
-            }}
-            onMouseOver={(e) => {
-              if (isVideoEnabled) {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (isVideoEnabled) {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-              }
-            }}
-          >
-            {isVideoEnabled ? '📴' : '📹'}
-          </button>
-        </div>
-      )}
 
       {!compact && (
         <div className="camera-info-panel">

@@ -6,11 +6,21 @@
 .single-screen-layout {
   width: 100vw;
   height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   color: #e2e8f0;
   overflow: hidden;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 /* 顶部导航栏 */
@@ -31,11 +41,25 @@
   gap: 20px;
 }
 
+.company-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .header-left h1 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: bold;
   margin: 0;
   color: #10b981;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: normal;
+  margin-left: 28px;
 }
 
 .robot-info {
@@ -69,7 +93,29 @@
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 12px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  margin-right: 8px;
+}
+
+.user-icon {
+  font-size: 16px;
+}
+
+.username {
+  font-size: 14px;
+  font-weight: 500;
+  color: #60a5fa;
 }
 
 .header-btn {
@@ -94,142 +140,230 @@
   color: #fca5a5;
 }
 
-/* Grid主体布局 */
-.layout-grid {
+/* 主布局容器 */
+.layout-main {
   flex: 1;
-  display: grid;
-  grid-template-columns: 240px 1fr 280px;
-  grid-template-rows: 1fr 120px;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  padding: 10px;
+  padding: 10px; /* 统一内边距，作为整体边缘 */
   min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-/* Grid区域定义 */
-.grid-control {
-  grid-area: 1 / 1 / 2 / 2;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid #334155;
-  border-radius: 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
+/* 上半部分：视频流区域 (70%高度) */
+.view-section {
+  flex: 0 0 70%;
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden; /* 防止内部溢出 */
 }
 
-.grid-video {
-  grid-area: 1 / 2 / 2 / 3;
+/* 左臂视角 (20%宽度 - 保持对称) */
+.view-left-arm {
+  flex: 0 0 20%;
+  min-width: 0;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid #334155;
   border-radius: 8px;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.grid-status {
-  grid-area: 1 / 3 / 2 / 4;
+/* 主控视频视角 (自适应剩余宽度) */
+.view-main {
+  flex: 1; /* 自适应宽度，避免 gap 导致的溢出 */
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px solid #10b981;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}
+
+/* 3D机器人叠加层 - 左上角 */
+.robot-3d-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
+  border: 2px solid rgba(16, 185, 129, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* 右臂视角 (20%宽度 - 保持对称) */
+.view-right-arm {
+  flex: 0 0 20%;
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 下半部分：控制区域 (30%高度，三列布局) */
+.control-section {
+  flex: 0 0 30%;
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 控制按钮区 (25%宽度 - 保持对称) */
+.control-buttons {
+  flex: 0 0 25%;
+  min-width: 0;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid #334155;
   border-radius: 8px;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
 }
 
-.grid-audio {
-  grid-area: 2 / 1 / 3 / 4;
+/* 中间区域：音频和仪表盘 (自适应剩余宽度) */
+.control-middle {
+  flex: 1; /* 自适应宽度 */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 中间区域大画布 - 和左侧保持一致 */
+.control-middle-canvas {
+  flex: 1;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid #334155;
   border-radius: 8px;
-  overflow: hidden;
-}
-
-/* PIP视频（画中画，预留未来第三视角） */
-.pip-video {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 320px;
-  height: 180px;
-  background: rgba(15, 23, 42, 0.9);
-  border: 2px solid #10b981;
-  border-radius: 8px;
-  z-index: 10;
-  overflow: hidden;
-}
-
-.pip-placeholder {
-  width: 100%;
-  height: 100%;
+  padding: 10px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 音频内联显示 */
+.control-audio-inline {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* 速度仪表盘区域 */
+.control-gauges {
+  flex: 1;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  color: #64748b;
+  justify-content: space-around;
+  gap: 15px;
+  min-width: 0;
+  min-height: 0;
 }
 
-.pip-placeholder span {
-  font-size: 48px;
-  margin-bottom: 8px;
-}
-
-.pip-placeholder p {
-  font-size: 14px;
-  margin: 0;
-}
-
-/* 3D机器人覆盖层 */
-.robot-3d-overlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 320px;
-  height: 180px;
-  background: rgba(15, 23, 42, 0.95);
+/* 右侧区域：3D机器人 (25%宽度 - 保持对称) */
+.control-robot3d {
+  flex: 0 0 25%;
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.6);
   border: 2px solid #10b981;
   border-radius: 8px;
-  z-index: 20;  /* 高于视频但低于控制栏 */
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+  position: relative;
 }
 
-.robot-3d-overlay canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
+/* 确保3D容器填满父容器 */
+.control-robot3d .robot-3d-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
 }
 
 /* 滚动条样式 */
-.grid-control::-webkit-scrollbar,
-.grid-status::-webkit-scrollbar {
+.control-buttons::-webkit-scrollbar {
   width: 6px;
 }
 
-.grid-control::-webkit-scrollbar-track,
-.grid-status::-webkit-scrollbar-track {
+.control-buttons::-webkit-scrollbar-track {
   background: rgba(15, 23, 42, 0.3);
   border-radius: 3px;
 }
 
-.grid-control::-webkit-scrollbar-thumb,
-.grid-status::-webkit-scrollbar-thumb {
+.control-buttons::-webkit-scrollbar-thumb {
   background: rgba(100, 116, 139, 0.5);
   border-radius: 3px;
 }
 
-.grid-control::-webkit-scrollbar-thumb:hover,
-.grid-status::-webkit-scrollbar-thumb:hover {
+.control-buttons::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.7);
 }
 
 /* 响应式调整（小屏幕） */
+@media (max-width: 1600px) {
+  .view-section {
+    flex: 0 0 65%;
+  }
+  
+  .control-section {
+    flex: 0 0 35%;
+  }
+}
+
 @media (max-width: 1400px) {
-  .layout-grid {
-    grid-template-columns: 200px 1fr 240px;
+  .view-left-arm,
+  .view-right-arm {
+    flex: 0 0 18%;
+  }
+  
+  .view-main {
+    flex: 0 0 64%;
+  }
+  
+  .control-buttons,
+  .control-audio {
+    flex: 0 0 50%;
+  }
+  
+  .robot-3d-overlay {
+    width: 250px;
+    height: 180px;
   }
 }
 
 @media (max-width: 1200px) {
-  .layout-grid {
-    grid-template-columns: 180px 1fr 220px;
-    grid-template-rows: 1fr 100px;
+  .view-label {
+    font-size: 11px;
   }
   
   .header-left h1 {

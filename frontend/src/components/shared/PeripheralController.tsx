@@ -18,21 +18,24 @@ interface PeripheralControllerProps {
 
 export function PeripheralController({ enabled = true, onCommandSent, onManagerReady }: PeripheralControllerProps) {
   const { publish } = useWebSocket();
-  const { setCommand } = useRobot3DStore();
+  const { setCommand, setMoveVelocity } = useRobot3DStore();
   const managerRef = useRef<PeripheralManager | null>(null);
   const mapperRef = useRef<InputMapper | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // 使用ref存储回调，避免依赖变化
   const publishRef = useRef(publish);
   const onCommandSentRef = useRef(onCommandSent);
   const setCommandRef = useRef(setCommand);
+  const setMoveVelocityRef = useRef(setMoveVelocity);
   
   // 更新refs
   publishRef.current = publish;
   onCommandSentRef.current = onCommandSent;
   setCommandRef.current = setCommand;
+  setMoveVelocityRef.current = setMoveVelocity;
   
   // 维护当前轴状态
   const axisStateRef = useRef<Record<number, number>>({});
@@ -83,26 +86,56 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         // 更新轴状态
         axisStateRef.current[event.axis.index] = event.axis.value;
         
-        // 节流发送（避免过于频繁）
+        // 调试日志：显示所有轴的状态（每100ms打印一次）
         const now = Date.now();
+        if (now - lastSendTimeRef.current >= sendIntervalMs) {
+          console.log(`[PeripheralController] 🎮 摇杆状态 - 轴[${event.axis.index}]: ${event.axis.value.toFixed(3)}, 所有轴:`, 
+            Object.keys(axisStateRef.current).map(idx => `[${idx}]=${axisStateRef.current[parseInt(idx)].toFixed(3)}`).join(', '));
+        }
+        
+        // 立即处理速度更新（不节流），确保松开时立即停止
+        // 合并所有轴的值发送命令（支持多向运动）
+        // 街机摇杆通常只有2个轴（X和Y），索引可能是0和1
+        const leftStickX = axisStateRef.current[0] || 0;
+        const leftStickY = axisStateRef.current[1] || 0;
+        
+        // 计算速度（减小死区，适配街机摇杆）
+        const deadzone = 0.05; // 从0.15减小到0.05，更敏感
+        
+        // 前后速度：前推为正，后拉为负
+        // 注意：Gamepad API中，Y轴向下为正，所以需要取反
+        const linearX = Math.abs(leftStickY) > deadzone ? -leftStickY * 1.0 : 0; // 速度系数从0.5增加到1.0
+        
+        // 左右速度：右推为正，左推为负（侧向移动）
+        const linearY = Math.abs(leftStickX) > deadzone ? leftStickX * 1.0 : 0; // 速度系数从0.5增加到1.0
+        
+        // 转向速度：街机摇杆通常没有右摇杆，使用左摇杆X轴控制转向
+        // 但为了不冲突，如果同时有左右移动和转向，优先使用左右移动
+        const angularZ = 0; // 街机摇杆通常不支持转向，需要单独按钮
+        
+        // 判断是否有实际输入
+        const hasInput = Math.abs(linearX) > 0.01 || Math.abs(linearY) > 0.01 || Math.abs(angularZ) > 0.01;
+        
+        // 立即更新Zustand store（不节流，确保松开时立即停止）
+        setMoveVelocityRef.current({
+          linearX: linearX,
+          linearY: linearY,
+          angularZ: angularZ
+        });
+        
+        // 节流发送其他命令（避免过于频繁）
         if (now - lastSendTimeRef.current >= sendIntervalMs) {
           lastSendTimeRef.current = now;
           
-          // 合并所有轴的值发送命令
-          const leftStickX = axisStateRef.current[0] || 0;
-          const leftStickY = axisStateRef.current[1] || 0;
+          // 调试日志：显示计算出的速度
+          if (hasInput) {
+            console.log(`[PeripheralController] 🚀 移动速度 - linearX: ${linearX.toFixed(3)}, linearY: ${linearY.toFixed(3)}, angularZ: ${angularZ.toFixed(3)}`);
+          } else if (isMovingRef.current) {
+            console.log(`[PeripheralController] 🛑 摇杆松开，停止移动`);
+          }
           
-          // 计算速度（添加死区）
-          const deadzone = 0.15;
-          
-          // 前后速度：前推为正，后拉为负
-          const linearX = Math.abs(leftStickY) > deadzone ? -leftStickY * 0.5 : 0;
-          
-          // 转向速度：左推为正，右推为负（可与前后组合）
-          const angularZ = Math.abs(leftStickX) > deadzone ? leftStickX * 1.0 : 0;
-          
-          // 根据线速度和角速度决定动画
-          const totalSpeed = Math.sqrt(linearX * linearX + angularZ * angularZ);
+          // 根据线速度和角速度决定动画（考虑多向运动）
+          const totalSpeed = Math.sqrt(linearX * linearX + linearY * linearY + angularZ * angularZ);
           
           let targetAnimation = 'Idle';
           
@@ -125,8 +158,23 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
             publishRef.current('robot_3d_command', { command: targetAnimation, timestamp: Date.now() }, 'std_msgs/String');
           }
           
-          // 判断是否有实际输入
-          const hasInput = Math.abs(linearX) > 0.01 || Math.abs(angularZ) > 0.01;
+          // 发送实时移动控制命令（用于URDF模型的位置控制，支持多向运动）
+          // 无论是否有输入，都要发送移动数据（包括停止命令）
+          const moveCommand = {
+            command: 'move',
+            linearX: linearX,
+            linearY: linearY,
+            angularZ: angularZ,
+            timestamp: Date.now()
+          };
+          
+          // 发送到WebSocket（用于ROS2后端）
+          publishRef.current('robot_3d_move', moveCommand, 'std_msgs/String');
+          
+          // 同时通过setCommand触发更新（作为备用）
+          if (hasInput) {
+            setCommandRef.current('move_' + moveCommand.timestamp);
+          }
           
           // 发送命令到ROS（有输入时发送速度，无输入但之前在移动时发送停止命令）
           if (hasInput || isMovingRef.current) {
@@ -135,7 +183,7 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
               topic: '/cmd_vel',
               messageType: 'geometry_msgs/Twist',
               payload: {
-                linear: { x: linearX, y: 0, z: 0 },
+                linear: { x: linearX, y: linearY, z: 0 },
                 angular: { x: 0, y: 0, z: angularZ },
               },
               priority: 5,
@@ -218,6 +266,10 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           publishRef.current('robot_3d_command', { command: command3D, timestamp }, 'std_msgs/String');
           // 跳过后续的广播逻辑
           command3D = null;
+        } else if (buttonIndex === 6) {
+          // 按钮6 - 双臂举起（新增动作）
+          command3D = 'RaiseArms';
+          setCommandRef.current(command3D + '_' + timestamp);
         }
         
         // 广播3D命令到其他屏幕（ABCD按钮，使用同一个时间戳）
@@ -230,8 +282,34 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           mapper.processInput(event);
         }
       } else if (event.type === 'button_up' && event.button) {
-        // 按钮松开事件 - ABCD按钮不需要处理（动作会自动结束）
-        // 只处理映射器中定义的其他按钮松开事件
+        const buttonIndex = event.button.index;
+        console.log(`[PeripheralController] 按钮${buttonIndex}松开`);
+        
+        // 处理按钮松开事件 - 重置对应的关节
+        if (buttonIndex >= 0 && buttonIndex <= 6) {
+          const timestamp = Date.now();
+          let releaseCommand: string | null = null;
+          
+          if (buttonIndex === 0) {
+            releaseCommand = 'Wave_release';  // 按钮A松开 - 重置右手
+          } else if (buttonIndex === 1) {
+            releaseCommand = 'ThumbsUp_release';  // 按钮B松开 - 重置左手
+          } else if (buttonIndex === 2) {
+            releaseCommand = 'WalkJump_release';  // 按钮C松开 - 重置右腿
+          } else if (buttonIndex === 3) {
+            releaseCommand = 'Jump_release';  // 按钮D松开 - 重置左腿
+          } else if (buttonIndex === 6) {
+            releaseCommand = 'RaiseArms_release';  // 按钮6松开 - 重置双臂
+          }
+          
+          if (releaseCommand) {
+            setCommandRef.current(releaseCommand + '_' + timestamp);
+            // 广播到其他屏幕
+            publishRef.current('robot_3d_command', { command: releaseCommand, timestamp }, 'std_msgs/String');
+          }
+        }
+        
+        // 处理映射器中定义的其他按钮松开事件
         mapper.processInput(event);
       } else {
         // 其他事件交给映射器处理
@@ -257,22 +335,47 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
       setError(`设备错误: ${error.message}`);
     });
 
-    // 启动管理器
-    manager.start().catch(err => {
-      console.error('[PeripheralController] 启动失败:', err);
-      const errorMsg = err.message || '未知错误';
-      
-      if (errorMsg.includes('Gamepad连接超时')) {
-        setError('手柄未激活 - 请按下手柄按钮');
-        console.log('💡 [提示] 请按下蓝牙手柄的任意按钮来激活它');
-      } else {
-        setError(`启动失败: ${errorMsg}`);
-      }
-    });
+    // 启动管理器，并在失败时自动重试
+    const startWithRetry = () => {
+      manager.start()
+        .then(() => {
+          console.log('[PeripheralController] 启动成功');
+          setError(null);
+          // 清除重试定时器
+          if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
+          }
+        })
+        .catch(err => {
+          console.warn('[PeripheralController] 启动失败，5秒后重试...', err);
+          const errorMsg = err.message || '未知错误';
+          
+          if (errorMsg.includes('Gamepad连接超时')) {
+            setError('等待手柄连接...');
+          } else {
+            setError('等待外设连接...');
+          }
+          
+          // 5秒后重试
+          retryTimerRef.current = setTimeout(() => {
+            console.log('[PeripheralController] 重试连接外设...');
+            startWithRetry();
+          }, 5000);
+        });
+    };
+    
+    // 首次启动
+    startWithRetry();
 
     // 清理
     return () => {
       console.log('[PeripheralController] 清理资源...');
+      // 清除重试定时器
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       manager.cleanup();
     };
   }, [enabled]); // 只依赖enabled，其他使用ref
@@ -283,14 +386,17 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
 
   return (
     <div className="peripheral-controller-status">
-      {isActive && (
+      {isActive ? (
         <div className="status-indicator active">
           🎮 外设控制已启用
         </div>
-      )}
-      {error && (
-        <div className="status-indicator error">
-          ⚠️ {error}
+      ) : error ? (
+        <div className="status-indicator connecting">
+          🔄 {error}
+        </div>
+      ) : (
+        <div className="status-indicator connecting">
+          🔄 正在连接外设...
         </div>
       )}
     </div>

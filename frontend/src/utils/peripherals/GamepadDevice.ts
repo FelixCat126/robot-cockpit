@@ -48,7 +48,7 @@ export class GamepadDevice extends BasePeripheralDevice {
   }
 
   async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       this.updateStatus(PeripheralStatus.CONNECTING);
 
       // 监听手柄连接
@@ -70,28 +70,42 @@ export class GamepadDevice extends BasePeripheralDevice {
       window.addEventListener('gamepadconnected', onConnected);
       window.addEventListener('gamepaddisconnected', onDisconnected);
 
-      // 检查是否已连接
-      const gamepads = navigator.getGamepads();
-      const existingGamepad = gamepads[this.gamepadIndex];
-      
-      if (existingGamepad) {
-        this.handleConnection(existingGamepad);
-        window.removeEventListener('gamepadconnected', onConnected);
-        resolve();
-      } else {
-        console.log('⏳ [Gamepad] 等待手柄连接...');
-        console.log('💡 [Gamepad] 提示：请按一下手柄上的任意按钮来激活');
+      // 持续轮询检测手柄（不依赖用户激活）
+      let pollCount = 0;
+      const pollInterval = setInterval(() => {
+        const gamepads = navigator.getGamepads();
+        const existingGamepad = gamepads[this.gamepadIndex];
         
-        // 30秒超时（给用户足够时间激活手柄）
-        setTimeout(() => {
-          if (this._status !== PeripheralStatus.CONNECTED) {
-            window.removeEventListener('gamepadconnected', onConnected);
-            this.updateStatus(PeripheralStatus.ERROR);
-            console.error('❌ [Gamepad] 连接超时 - 请确认手柄已开启并按下任意按钮');
-            reject(new Error('Gamepad连接超时 - 请按下手柄按钮激活'));
+        if (existingGamepad) {
+          console.log('✅ [Gamepad] 检测到手柄连接:', existingGamepad.id);
+          clearInterval(pollInterval);
+          this.handleConnection(existingGamepad);
+          window.removeEventListener('gamepadconnected', onConnected);
+          resolve();
+        } else {
+          pollCount++;
+          if (pollCount === 1) {
+            console.log('⏳ [Gamepad] 正在持续检测手柄连接...');
           }
-        }, 30000);
-      }
+          // 不设置超时，持续检测
+          if (pollCount > 150) { // 30秒后降低检测频率
+            clearInterval(pollInterval);
+            // 改为每秒检测一次
+            const slowPoll = setInterval(() => {
+              const gamepads = navigator.getGamepads();
+              const gp = gamepads[this.gamepadIndex];
+              if (gp) {
+                console.log('✅ [Gamepad] 检测到手柄连接:', gp.id);
+                clearInterval(slowPoll);
+                this.handleConnection(gp);
+                resolve();
+              }
+            }, 1000);
+            // 首次resolve，但保持后台检测
+            resolve();
+          }
+        }
+      }, 200); // 每200ms检测一次
     });
   }
 

@@ -8,7 +8,6 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { getIcon } from '../ControlIcons';
 import { useRobot3DStore } from '../../stores/robot3DStore';
 import { PeripheralController } from './PeripheralController';
-import { PeripheralDebugPanel } from './PeripheralDebugPanel';
 import { RobotCommand } from '../../types/peripheral.types';
 import './CompactStyles.css';
 
@@ -18,7 +17,6 @@ interface ControlPanelProps {
   className?: string;
   onRobotControl?: (command: string) => void; // 机器人控制回调
   enablePeripherals?: boolean; // 是否启用外设控制
-  showPeripheralDebug?: boolean; // 是否显示外设调试面板
   connected?: boolean; // 外部传入的WebSocket连接状态
   publish?: (topic: string, message: any, type?: string) => void; // 外部传入的发布函数
 }
@@ -29,7 +27,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   className = '',
   onRobotControl,
   enablePeripherals = false,
-  showPeripheralDebug = false,
   connected: externalConnected,
   publish: externalPublish,
 }) => {
@@ -44,51 +41,25 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const publish = externalPublish || internalWebSocket.publish;
   const [selectedCommand, setSelectedCommand] = useState<string>('');
   const { setCommand } = useRobot3DStore();
-  const [peripheralManager, setPeripheralManager] = useState<any>(null);
-  const [showDebug, setShowDebug] = useState(showPeripheralDebug);
 
 
-  // 控制命令列表
+  // 控制命令列表 - 只保留基本功能
   const commandCategories = [
     {
       title: '基本控制',
       commands: [
         { id: 'start', label: '启动', color: '#10b981' },
         { id: 'stop', label: '停止', color: '#ef4444' },
-        { id: 'pause', label: '暂停', color: '#f59e0b' },
-        { id: 'resume', label: '继续', color: '#3b82f6' },
-      ],
-    },
-    {
-      title: '运动控制',
-      commands: [
-        { id: 'forward', label: '前进', color: '#3b82f6' },
-        { id: 'backward', label: '后退', color: '#3b82f6' },
-        { id: 'left', label: '左转', color: '#3b82f6' },
-        { id: 'right', label: '右转', color: '#3b82f6' },
-      ],
-    },
-    {
-      title: '动作控制',
-      commands: [
-        { id: 'Wave', label: '挥手', color: '#06b6d4' },
-        { id: 'ThumbsUp', label: '点赞', color: '#06b6d4' },
-        { id: 'WalkJump', label: '跨栏', color: '#14b8a6' },
-        { id: 'Jump', label: '跳跃', color: '#14b8a6' },
-      ],
-    },
-    {
-      title: '紧急控制',
-      commands: [
         { id: 'emergency_stop', label: '紧急停止', color: '#dc2626' },
         { id: 'reset', label: '系统重置', color: '#f59e0b' },
       ],
     },
   ];
 
-  // 发送命令
+  // 发送命令 (按下)
   const handleSendCommand = (commandId: string) => {
-    console.log('[ControlPanel] Web按钮点击:', commandId);
+    console.log('[ControlPanel] Web按钮按下:', commandId);
+    const timestamp = Date.now();
     const command = {
       type: commandId,
       timestamp: new Date().toISOString(),
@@ -100,22 +71,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       publish('/robot/commands', command);
       
       // 广播到其他屏幕（用于多屏3D同步）
-      publish('robot_3d_command', { command: commandId, timestamp: Date.now() }, 'std_msgs/String');
+      publish('robot_3d_command', { command: commandId, timestamp }, 'std_msgs/String');
     } else {
       console.warn('[ControlPanel] WebSocket未连接，无法发送命令');
     }
     
     // 2. 触发本地3D机器人控制（通过Zustand状态）
-    // 添加时间戳确保每次点击都触发，即使是相同的命令
     console.log('[ControlPanel] 调用setCommand:', commandId);
-    setCommand(commandId + '_' + Date.now());
+    setCommand(commandId + '_' + timestamp);
     if (onRobotControl) {
       onRobotControl(commandId);
     }
     
-    // 更新选中命令显示（不自动清除，避免与外设控制冲突）
+    // 更新选中命令显示
     setSelectedCommand(commandId);
   };
+  
 
   // 处理外设命令
   const handlePeripheralCommand = (cmd: RobotCommand) => {
@@ -146,29 +117,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <PeripheralController 
           enabled={enablePeripherals} 
           onCommandSent={handlePeripheralCommand}
-          onManagerReady={setPeripheralManager}
+          onManagerReady={() => {}}
         />
       )}
 
-      {/* 外设调试面板切换按钮 */}
-      {enablePeripherals && !compact && (
-        <div className="peripheral-controls">
-          <button 
-            className="debug-toggle-btn"
-            onClick={() => setShowDebug(!showDebug)}
-          >
-            {showDebug ? '🎮 隐藏外设调试' : '🎮 显示外设调试'}
-          </button>
-        </div>
-      )}
-
-      {/* 外设调试面板 */}
-      {enablePeripherals && showDebug && (
-        <PeripheralDebugPanel 
-          manager={peripheralManager} 
-          compact={compact}
-        />
-      )}
 
       <div className="control-content">
         {commandCategories.map((category) => (
@@ -176,12 +128,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {!compact && <h2 className="category-title" style={{ fontSize: '14px', marginBottom: '8px' }}>{category.title}</h2>}
             <div className="command-grid" style={{ 
               display: 'flex', 
-              flexWrap: 'wrap', 
+              flexWrap: 'nowrap', 
               gap: '8px', 
-              justifyContent: 'flex-start' 
+              justifyContent: 'flex-start',
+              width: '100%'
             }}>
               {category.commands.map((cmd) => {
                 const IconComponent = getIcon(cmd.id);
+                
                 return (
                   <button
                     key={cmd.id}
@@ -189,23 +143,24 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     style={{
                       borderColor: cmd.color,
                       backgroundColor: selectedCommand === cmd.id ? cmd.color : 'transparent',
-                      minWidth: compact ? '45px' : '65px',
-                      minHeight: compact ? '45px' : '65px',
-                      maxWidth: compact ? '45px' : '75px',
-                      maxHeight: compact ? '45px' : '75px',
-                      padding: compact ? '6px' : '10px',
-                      flex: '0 0 calc(50% - 4px)'
+                      minWidth: compact ? '50px' : '60px',
+                      minHeight: compact ? '50px' : '60px',
+                      maxWidth: compact ? '50px' : 'none',
+                      maxHeight: compact ? '50px' : 'none',
+                      padding: compact ? '6px' : '8px',
+                      flex: '1 1 0',
+                      width: '0'
                     }}
                     onClick={() => handleSendCommand(cmd.id)}
                     title={cmd.label}
                   >
                     <span className="command-icon">
                       <IconComponent 
-                        size={compact ? 18 : 24} 
+                        size={compact ? 20 : 24} 
                         color={selectedCommand === cmd.id ? 'white' : cmd.color} 
                       />
                     </span>
-                    {!compact && <span className="command-label" style={{ fontSize: '11px' }}>{cmd.label}</span>}
+                    {!compact && <span className="command-label" style={{ fontSize: '11px', fontWeight: 'bold' }}>{cmd.label}</span>}
                   </button>
                 );
               })}
@@ -213,14 +168,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         ))}
 
-        {selectedCommand && !compact && (
-          <div className="command-feedback">
-            <div className="feedback-icon">✅</div>
-            <div className="feedback-text">
-              命令已发送: <strong>{selectedCommand}</strong>
-            </div>
-          </div>
-        )}
 
         {!connected && (
           <div className="warning-message">
