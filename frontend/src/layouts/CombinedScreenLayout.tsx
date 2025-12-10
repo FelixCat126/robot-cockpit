@@ -19,12 +19,17 @@ import Screen0 from '../screens/Screen0';
 import Screen1 from '../screens/Screen1';
 import Screen2 from '../screens/Screen2';
 import Screen3 from '../screens/Screen3';
+import { getScreenResolution, calculateCombinedLayoutProportions, logScreenInfo } from '../utils/screenResolution';
 import './CombinedScreenLayout.css';
 
 export const CombinedScreenLayout: React.FC = () => {
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(() => {
     const saved = localStorage.getItem('robot_cockpit_selected_robot');
     return saved || null;
+  });
+  const [layoutProportions, setLayoutProportions] = useState(() => {
+    const resolution = getScreenResolution();
+    return calculateCombinedLayoutProportions(resolution);
   });
   const { isAuthenticated, checkAuth } = useAuthStore();
   const checkAuthRef = useRef(checkAuth);
@@ -34,6 +39,22 @@ export const CombinedScreenLayout: React.FC = () => {
   useEffect(() => {
     remoteLogger.setScreenId(0); // 组合布局使用屏幕0
     checkAuthRef.current();
+    
+    // 检测屏幕分辨率并调整布局
+    const resolution = getScreenResolution();
+    logScreenInfo();
+    const proportions = calculateCombinedLayoutProportions(resolution);
+    setLayoutProportions(proportions);
+    
+    // 监听窗口大小变化
+    const handleResize = () => {
+      const newResolution = getScreenResolution();
+      const newProportions = calculateCombinedLayoutProportions(newResolution);
+      setLayoutProportions(newProportions);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -153,7 +174,13 @@ export const CombinedScreenLayout: React.FC = () => {
   // 已登录且已选择机器人：显示组合布局
   return (
     <div className="combined-screen-layout">
-      <div className="combined-grid">
+      <div 
+        className="combined-grid"
+        style={{
+          gridTemplateColumns: `${layoutProportions.controlWidth} ${layoutProportions.videoWidth} ${layoutProportions.statusWidth}`,
+          gridTemplateRows: `${layoutProportions.controlHeight} ${layoutProportions.statusHeight}`,
+        }}
+      >
         {/* 左上角：主控屏（Screen0） */}
         <div className="combined-panel combined-panel-control">
           <Screen0 screenId={0} onDeselectRobot={handleDeselectRobot} />
