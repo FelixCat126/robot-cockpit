@@ -12,53 +12,58 @@
 
 .combined-grid {
   display: grid;
-  grid-template-columns: 22% 58% 20%; /* 左：控制+状态，中：视频（大部分），右：3D */
-  grid-template-rows: 38% 62%; /* 上：控制，下：状态 */
+  grid-template-columns: 25% 50% 25%; /* 左：控制+状态，中：视频（大部分），右：3D */
+  grid-template-rows: 40% 60%; /* 上：控制，下：状态 */
   gap: 8px;
   padding: 8px;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
+  position: relative;
 }
 
 /* 左上角：主控屏 */
 .combined-panel-control {
-  grid-column: 1;
-  grid-row: 1;
+  grid-column: 1 / 2;
+  grid-row: 1 / 2;
   overflow: hidden;
   background: #1a1a1a;
   border-radius: 8px;
   border: 1px solid #333;
+  position: relative;
 }
 
 /* 中间大部分：视频视角屏 */
 .combined-panel-video {
-  grid-column: 2;
+  grid-column: 2 / 3;
   grid-row: 1 / 3; /* 跨越两行 */
   overflow: hidden;
   background: #0a0a0a;
   border-radius: 8px;
   border: 1px solid #333;
+  position: relative;
 }
 
 /* 左下角：状态屏 */
 .combined-panel-status {
-  grid-column: 1;
-  grid-row: 2;
+  grid-column: 1 / 2;
+  grid-row: 2 / 3;
   overflow: hidden;
   background: #1a1a1a;
   border-radius: 8px;
   border: 1px solid #333;
+  position: relative;
 }
 
 /* 右侧：3D屏 */
 .combined-panel-3d {
-  grid-column: 3;
+  grid-column: 3 / 4;
   grid-row: 1 / 3; /* 跨越两行 */
   overflow: hidden;
   background: #0a0a0a;
   border-radius: 8px;
   border: 1px solid #333;
+  position: relative;
 }
 
 /* 面板内部内容 */
@@ -118,19 +123,34 @@
 
 /* 控制面板紧凑模式 */
 .combined-panel-control .screen-content {
-  padding: 4px;
+  padding: 6px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .combined-panel-control .control-panel {
   height: auto;
   min-height: 100%;
+  width: 100%;
 }
 
 .combined-panel-control .control-panel .command-button {
-  padding: 6px 10px;
-  font-size: 11px;
-  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 12px;
+  min-height: 40px;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+/* 确保外设控制器正常显示 */
+.combined-panel-control .peripheral-controller {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.combined-panel-control .peripheral-debug-panel {
+  font-size: 10px;
+  padding: 6px;
 }
 
 /* 视频面板紧凑模式 */
@@ -198,16 +218,24 @@
   height: 100% !important;
 }
 
+/* 确保面板内容正确填充 */
+.combined-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
 /* 响应式调整 */
 @media (max-width: 1920px) {
   .combined-grid {
-    grid-template-columns: 30% 40% 30%;
+    grid-template-columns: 25% 50% 25%;
   }
 }
 
 @media (max-width: 1366px) {
   .combined-grid {
-    grid-template-columns: 28% 44% 28%;
+    grid-template-columns: 25% 50% 25%;
     gap: 4px;
     padding: 4px;
   }
