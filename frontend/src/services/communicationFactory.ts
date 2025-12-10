@@ -4,10 +4,12 @@
  * 根据机器人配置自动选择最佳通信方式
  */
 
-import { ICommunicationService, WebRTCConfig } from './communication.interface';
+import { ICommunicationService } from './communication.interface';
 import websocketService from './websocket';
 import webrtcService from './webrtc';
-import { RobotConfig, getRobotConfig, fetchRobotConfigFromCloud } from '../config/robots';
+// TODO: 启用完整连接流程时需要取消下方导入的注释
+// import type { RobotConfig, WebRTCConfig } from './communication.interface';
+// import { RobotConfig, getRobotConfig, fetchRobotConfigFromCloud } from '../config/robots';
 
 export type CommunicationMode = 'websocket' | 'webrtc';
 
@@ -66,7 +68,7 @@ class CommunicationFactory {
    * 
    * TODO: 临时跳过实际连接，待远端机器人就绪后启用
    */
-  async connectToRobot(robotId: string, preferredMode?: CommunicationMode): Promise<void> {
+  async connectToRobot(robotId: string, _preferredMode?: CommunicationMode): Promise<void> {
     console.log(`[CommunicationFactory] Connecting to robot: ${robotId}`);
 
     // ========== 临时方案：跳过实际连接 ==========
@@ -78,7 +80,9 @@ class CommunicationFactory {
     // ========== 临时方案结束 ==========
 
     // ========== 完整连接流程（暂时禁用）==========
-    // eslint-disable-next-line no-unreachable
+    // TODO: 远端机器人就绪后，删除上方临时方案代码（第72-78行），启用此段代码
+    // 注意：启用时需要取消下方代码的注释
+    /*
     try {
       // 1. 获取机器人配置（优先从云端获取）
       let robotConfig = await fetchRobotConfigFromCloud(robotId);
@@ -119,6 +123,7 @@ class CommunicationFactory {
       console.error('[CommunicationFactory] Failed to connect to robot:', error);
       throw error;
     }
+    */
     // ========== 完整连接流程结束 ==========
   }
 
@@ -138,7 +143,9 @@ class CommunicationFactory {
   /**
    * 检测最佳通信模式
    * 根据机器人配置和环境变量自动选择
+   * TODO: 启用完整连接流程时取消注释
    */
+  /*
   private detectBestMode(robotConfig: RobotConfig): CommunicationMode {
     // 1. 检查环境变量
     const forceMode = import.meta.env.VITE_COMMUNICATION_MODE as CommunicationMode | undefined;
@@ -157,6 +164,7 @@ class CommunicationFactory {
     console.log('[CommunicationFactory] Defaulting to WebSocket mode');
     return 'websocket';
   }
+  */
 
   /**
    * 获取连接统计信息
