@@ -241,20 +241,48 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           throw new Error('无法获取canvas 2d context');
     }
 
+    // 设置canvas尺寸
     canvas.width = 1920;
     canvas.height = 1080;
 
+    // 先绘制一帧，确保canvas有内容
+    drawSimulatedVideo(ctx, canvas.width, canvas.height);
+
+    // 创建视频流（30fps）
     const stream = canvas.captureStream(30);
     streamRef.current = stream;
         // 模拟视频流创建成功
 
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+      
+      // 等待视频元数据加载
+      await new Promise<void>((resolve, reject) => {
+        if (!videoRef.current) {
+          reject(new Error('videoRef丢失'));
+          return;
+        }
+        
+        const video = videoRef.current;
+        
+        const onLoadedMetadata = () => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          resolve();
+        };
+        
+        video.addEventListener('loadedmetadata', onLoadedMetadata);
+        
+        // 超时保护
+        setTimeout(() => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          resolve(); // 即使超时也继续
+        }, 3000);
+      });
+      
+      // 开始播放视频
+      await videoRef.current.play();
           // 模拟视频播放成功
     }
-
-    drawSimulatedVideo(ctx, canvas.width, canvas.height);
 
     setCameraInfo({
       width: 1920,
@@ -345,7 +373,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   return (
     <div className={`video-player ${compact ? 'compact' : ''} ${className}`}>
-      <div className="video-container" style={{ position: 'relative' }}>
+      <div className="video-container" style={{ position: 'relative', backgroundColor: '#000' }}>
         {/* 视频和Canvas元素 - 始终渲染 */}
         <video
           ref={videoRef}
@@ -357,7 +385,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            display: isVideoLoading || videoError || !isVideoEnabled ? 'none' : 'block'
+            display: isVideoLoading || videoError || !isVideoEnabled ? 'none' : 'block',
+            backgroundColor: '#000' // 确保背景是黑色，避免显示空白
           }}
         />
         <canvas 
