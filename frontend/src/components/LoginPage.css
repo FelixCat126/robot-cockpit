@@ -6,6 +6,9 @@
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #ffffff;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .login-container {
@@ -162,6 +165,10 @@
   transition: all 0.3s ease;
   white-space: nowrap;
   min-width: 120px;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
 }
 
 .get-code-btn:hover:not(:disabled) {
@@ -218,6 +225,11 @@
   cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 10px;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .login-button:hover:not(:disabled) {

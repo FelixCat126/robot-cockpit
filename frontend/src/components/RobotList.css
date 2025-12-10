@@ -5,6 +5,9 @@
   color: white;
   padding: 2rem;
   overflow-y: auto;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .robot-list-header {
@@ -40,6 +43,10 @@
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
 }
 
 .robot-card:hover {
@@ -154,6 +161,11 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .select-button:hover:not(:disabled) {

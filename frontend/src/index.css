@@ -13,11 +13,58 @@ body {
   overflow: hidden;
   width: 100vw;
   height: 100vh;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 #root {
   width: 100%;
   height: 100%;
+  /* 触控优化 */
+  touch-action: manipulation;
+}
+
+/* 触控优化：所有可交互元素 */
+button,
+input,
+select,
+textarea,
+a,
+[role="button"],
+[onclick] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  /* 确保按钮有足够大的点击区域 */
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* 输入框允许文本选择 */
+input[type="text"],
+input[type="tel"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: auto;
+}
+
+/* 禁用双击缩放 */
+* {
+  touch-action: manipulation;
+}
+
+/* 允许滚动的元素 */
+.scrollable,
+[class*="scroll"],
+[class*="overflow"] {
+  touch-action: pan-y pan-x;
 }
 
 code {

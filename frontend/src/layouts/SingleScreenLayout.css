@@ -21,6 +21,9 @@
   left: 0;
   right: 0;
   bottom: 0;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* 顶部导航栏 */
@@ -127,6 +130,11 @@
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .header-btn:hover {
@@ -308,6 +316,17 @@
   display: flex;
   align-items: stretch;
   justify-content: stretch;
+}
+
+/* 触控优化：所有按钮和交互元素 */
+.single-screen-layout button,
+.single-screen-layout [role="button"],
+.single-screen-layout .command-button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  /* 确保按钮有足够大的点击区域 */
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* 滚动条样式 */

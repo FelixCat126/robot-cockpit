@@ -8,6 +8,12 @@
   overflow: hidden;
 }
 
+/* 触控优化：主控屏（Screen0） */
+.screen.screen-0 {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .screen-header {
   display: flex;
   justify-content: space-between;
@@ -62,6 +68,11 @@
   font-size: 14px;
   font-weight: 500;
   transition: background-color 0.3s;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .logout-btn:hover {
@@ -78,6 +89,11 @@
   font-size: 14px;
   font-weight: 500;
   transition: background-color 0.3s;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .change-robot-btn:hover {
@@ -130,6 +146,10 @@
   cursor: pointer;
   transition: all 0.3s ease;
   min-height: 100px;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 44px;
 }
 
 .command-button:hover {
@@ -139,6 +159,16 @@
 
 .command-button:active:not(:disabled) {
   transform: translateY(-2px);
+}
+
+/* 触控优化：主控屏的所有按钮 */
+.screen.screen-0 button,
+.screen.screen-0 [role="button"],
+.screen.screen-0 .command-button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 

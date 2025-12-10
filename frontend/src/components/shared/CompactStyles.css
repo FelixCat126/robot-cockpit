@@ -34,6 +34,9 @@
   min-height: 60px;
   padding: 6px;
   border-width: 1px;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .control-panel.compact .command-icon {
@@ -91,6 +94,11 @@
 .video-player.compact .control-btn {
   padding: 6px 10px;
   font-size: 16px;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .video-player.compact .video-overlay {
@@ -290,6 +298,9 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .control-btn-mini:hover {
@@ -332,6 +343,11 @@
 .audio-player.compact .control-btn {
   padding: 4px 8px;
   font-size: 16px;
+  /* 触控优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .audio-player.compact .audio-visualizer {
@@ -426,6 +442,16 @@
 .control-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 触控优化：所有控制按钮 */
+.control-btn,
+.command-button,
+.overlay-control-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* ========== StatusMonitor 紧凑样式 ========== */
