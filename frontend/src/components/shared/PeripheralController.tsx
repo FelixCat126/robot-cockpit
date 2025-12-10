@@ -114,9 +114,10 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         const hasInput = Math.abs(linearX) > 0.01 || Math.abs(angularZ) > 0.01;
         
         // 立即更新Zustand store（不节流，确保松开时立即停止）
+        // 注意：只使用linearX（前后）和angularZ（转向），不使用linearY（左右位移）
         setMoveVelocityRef.current({
           linearX: linearX,
-          linearY: linearY,
+          linearY: 0, // 不使用左右位移，只使用前后+转向
           angularZ: angularZ
         });
         
@@ -149,12 +150,14 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
             publishRef.current('robot_3d_command', { command: targetAnimation, timestamp: Date.now() }, 'std_msgs/String');
           }
           
-          // 发送实时移动控制命令（用于URDF模型的位置控制，与单屏模式一致）
+          // 发送实时移动控制命令（用于3D模型的足部动画）
+          // 注意：只使用linearX（前后）和angularZ（转向），不使用linearY（左右位移）
+          // 前进后退通过足部动画（Walking/Running）表示，不是位移
           // 无论是否有输入，都要发送移动数据（包括停止命令）
             const moveCommand = {
               command: 'move',
               linearX: linearX,
-              linearY: 0, // 单屏模式不使用左右位移
+              linearY: 0, // 不使用左右位移，只使用前后+转向
               angularZ: angularZ,
               timestamp: Date.now()
             };
@@ -168,13 +171,15 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           }
           
           // 发送命令到ROS（有输入时发送速度，无输入但之前在移动时发送停止命令）
+          // 注意：只使用linearX（前后）和angularZ（转向），不使用linearY（左右位移）
+          // 前进后退通过足部动画（Walking/Running）表示，不是位移
           if (hasInput || isMovingRef.current) {
             const command: RobotCommand = {
               type: 'velocity' as any,
               topic: '/cmd_vel',
               messageType: 'geometry_msgs/Twist',
               payload: {
-                linear: { x: linearX, y: linearY, z: 0 },
+                linear: { x: linearX, y: 0, z: 0 }, // 不使用linearY，避免位移
                 angular: { x: 0, y: 0, z: angularZ },
               },
               priority: 5,

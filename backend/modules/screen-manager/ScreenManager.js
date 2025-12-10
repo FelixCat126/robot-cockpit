@@ -497,43 +497,21 @@ class ScreenManager extends EventEmitter {
         height: screen.height,
       };
 
-      if (isSingleDisplayMode) {
-        // 单显示器模式：移除全屏参数，使用窗口模式
-        browserArgs = browserArgs.filter(arg => 
-          arg !== '--kiosk' && arg !== '--start-fullscreen'
-        );
-        
-        // 对于 Screen 0（笔记本），不设置固定尺寸，为全屏做准备
-        // 对于 Screen 1-3（外接显示器），设置窗口模式的固定尺寸
-        if (screenId === 0) {
-          // Screen 0: 保持原始分辨率，不限制窗口大小
-          // 不添加 --window-size 参数，让全屏模式自适应
-          this.log('info', `[Dual Display] Screen 0 using auto-size for fullscreen`);
-        } else {
-          // Screen 1-3: 使用固定的窗口尺寸
-          const windowConfig = this.config.singleDisplayWindow;
-          viewportConfig = {
-            width: windowConfig.width,
-            height: windowConfig.height,
-          };
-          
-          // 使用从屏幕配置中获取的 X 坐标（已在 startAllScreens 中更新）
-          const windowX = screen.x;
-          const windowY = screen.y;
-          
-          browserArgs.push(`--window-position=${windowX},${windowY}`);
-          browserArgs.push(`--window-size=${windowConfig.width},${windowConfig.height}`);
-          
-          this.log('info', `[Dual Display] Window ${screenId} at (${windowX}, ${windowY}), size ${viewportConfig.width}x${viewportConfig.height}`);
-        }
-      } else {
-        // 多显示器模式：保留全屏参数，确保浏览器以全屏模式启动
-        // 添加窗口位置参数（如果支持）
-        browserArgs.push(`--window-position=${screen.x},${screen.y}`);
-        browserArgs.push(`--window-size=${screen.width},${screen.height}`);
-        
-        this.log('info', `[Multi Display] Screen ${screenId} will launch at (${screen.x}, ${screen.y}) with size ${screen.width}x${screen.height}`);
-      }
+      // 所有屏幕都自适应尺寸并最大化（非全屏）
+      // 移除全屏参数，使用窗口最大化模式
+      browserArgs = browserArgs.filter(arg => 
+        arg !== '--kiosk' && arg !== '--start-fullscreen'
+      );
+      
+      // 不设置固定尺寸，让窗口自适应屏幕大小
+      // 只设置窗口位置，不设置窗口大小（让窗口最大化）
+      const windowX = screen.x;
+      const windowY = screen.y;
+      
+      browserArgs.push(`--window-position=${windowX},${windowY}`);
+      // 不添加 --window-size 参数，让窗口自适应并最大化
+      
+      this.log('info', `[Auto-size] Screen ${screenId} will launch at (${windowX}, ${windowY}), auto-size and maximize`);
 
       // 检测并使用系统Chrome
       const executablePath = this.detectChromePath();
@@ -543,8 +521,8 @@ class ScreenManager extends EventEmitter {
         ...this.config.browser,
         args: browserArgs,
         ignoreDefaultArgs: ['--enable-automation'],  // 移除自动化标识
-        // Screen 0 使用 null viewport 以允许全屏自适应，其他屏幕使用固定 viewport
-        defaultViewport: (screenId === 0 && isSingleDisplayMode) ? null : viewportConfig,
+        // 所有屏幕都使用 null viewport 以允许自适应
+        defaultViewport: null,
       };
 
       // 如果找到了系统Chrome，使用它
@@ -597,102 +575,42 @@ class ScreenManager extends EventEmitter {
       const page = await browser.newPage();
       
       // 设置视口大小
-      // Screen 0 在单显示器模式下跳过 setViewport，让全屏模式自适应
-      if (screenId === 0 && isSingleDisplayMode) {
-        this.log('info', `[Dual Display] Screen 0 skipping viewport setting for fullscreen auto-adapt`);
-        // 不调用 setViewport()，让浏览器使用默认（已设置 defaultViewport: null）
-      } else {
-        await page.setViewport(viewportConfig);
-      }
+      // 所有屏幕都跳过 setViewport，让窗口自适应屏幕大小
+      this.log('info', `[Auto-size] Screen ${screenId} skipping viewport setting for auto-adapt`);
+      // 不调用 setViewport()，让浏览器使用默认（已设置 defaultViewport: null）
 
-      // 根据模式设置窗口位置和大小
-      if (isSingleDisplayMode) {
-        // 单显示器模式或混合显示器模式：使用预定义的屏幕坐标
+      // 所有屏幕都自适应尺寸并最大化（非全屏）
+      try {
+        const windowX = screen.x;
+        const windowY = screen.y;
+        
+        this.log('info', `[Auto-size] Positioning window ${screenId} at (${windowX}, ${windowY}), will maximize`);
+        
+        // 使用CDP协议设置窗口位置并最大化
+        const client = await page.target().createCDPSession();
+        const windowId = await client.send('Browser.getWindowForTarget', {
+          targetId: page.target()._targetId
+        });
+        
         try {
-          // 对于 Screen 0（笔记本），跳过固定尺寸设置，直接设置全屏
-          // 对于 Screen 1-3（外接显示器），设置固定尺寸
-          if (screenId !== 0) {
-            // 直接使用 createDefaultScreens() 中定义的坐标
-            const windowX = screen.x;
-            const windowY = screen.y;
-            const windowWidth = screen.width;
-            const windowHeight = screen.height;
-            
-            // 使用CDP协议设置窗口位置
-            const client = await page.target().createCDPSession();
-            const windowId = await client.send('Browser.getWindowForTarget', {
-              targetId: page.target()._targetId
-            });
-            
-            try {
-              await client.send('Browser.setWindowBounds', {
-                windowId: windowId.windowId,
-                bounds: {
-                  left: windowX,
-                  top: windowY,
-                  width: windowWidth,
-                  height: windowHeight,
-                }
-              });
-              this.log('info', `[Dual Display] Window ${screenId} positioned at (${windowX}, ${windowY}), size ${windowWidth}x${windowHeight}`);
-            } catch (e) {
-              this.log('warn', `Could not set window position for screen ${screenId}: ${e.message}`);
+          // 先设置窗口位置，然后最大化（非全屏）
+          await client.send('Browser.setWindowBounds', {
+            windowId: windowId.windowId,
+            bounds: {
+              left: windowX,
+              top: windowY,
+              windowState: 'maximized', // 最大化窗口（非全屏）
             }
-          } else {
-            // Screen 0: 不设置固定尺寸，等待后面设置全屏
-            this.log('info', `[Dual Display] Screen 0 will be set to fullscreen (skipping fixed size)`);
-          }
-        } catch (e) {
-          this.log('warn', `CDP session failed for screen ${screenId}: ${e.message}`);
-        }
-      } else {
-        // 多显示器模式：将窗口定位到对应的显示器并全屏
-        try {
-          // 使用检测到的显示器坐标
-          const windowX = screen.x;
-          const windowY = screen.y;
-          
-          this.log('info', `[Multi Display] Positioning window ${screenId} to display at (${windowX}, ${windowY}), size ${screen.width}x${screen.height}`);
-          
-          // 使用CDP协议设置窗口位置和大小
-          const client = await page.target().createCDPSession();
-          const windowId = await client.send('Browser.getWindowForTarget', {
-            targetId: page.target()._targetId
           });
+          this.log('info', `[Auto-size] Window ${screenId} positioned at (${windowX}, ${windowY}) and maximized`);
           
-          try {
-            // 先设置窗口位置和大小
-            await client.send('Browser.setWindowBounds', {
-              windowId: windowId.windowId,
-              bounds: {
-                left: windowX,
-                top: windowY,
-                width: screen.width,
-                height: screen.height,
-                windowState: 'normal', // 先设置为normal，然后通过全屏参数实现全屏
-              }
-            });
-            this.log('info', `[Multi Display] Window ${screenId} positioned at display (${windowX}, ${windowY})`);
-            
-            // 延迟一下，确保窗口位置设置完成
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (e) {
-            this.log('warn', `Could not set window position for screen ${screenId}: ${e.message}`);
-            // 如果设置失败，尝试使用全屏状态
-            try {
-              await client.send('Browser.setWindowBounds', {
-                windowId: windowId.windowId,
-                bounds: {
-                  windowState: 'fullscreen',
-                }
-              });
-            } catch (e2) {
-              this.log('warn', `Could not set fullscreen for screen ${screenId}: ${e2.message}`);
-            }
-          }
+          // 延迟一下，确保窗口位置设置完成
+          await new Promise(resolve => setTimeout(resolve, 500));
         } catch (e) {
-          this.log('warn', `CDP session failed for screen ${screenId}: ${e.message}`);
+          this.log('warn', `Could not set window position/maximize for screen ${screenId}: ${e.message}`);
         }
+      } catch (e) {
+        this.log('warn', `CDP session failed for screen ${screenId}: ${e.message}`);
       }
 
       // 导航到前端应用

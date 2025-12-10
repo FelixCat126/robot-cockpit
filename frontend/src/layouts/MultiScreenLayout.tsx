@@ -181,7 +181,8 @@ export const MultiScreenLayout: React.FC = () => {
 
     switch (screenId) {
       case 0:
-        return <Screen0 screenId={screenId} onDeselectRobot={handleDeselectRobot} />;
+        // Screen0可以切换查看其他屏幕，传递isViewingOtherScreen=false（因为这是真正的Screen0，不是切换后的视图）
+        return <Screen0 screenId={screenId} onDeselectRobot={handleDeselectRobot} isViewingOtherScreen={false} />;
       case 1:
         return <Screen1 screenId={screenId} />;
       case 2:
