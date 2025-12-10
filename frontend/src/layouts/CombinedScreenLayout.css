@@ -4,22 +4,39 @@
  */
 
 .combined-screen-layout {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
   background: #0a0a0a;
+  position: relative !important;
+  top: 0;
+  left: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* 覆盖App.css的全局样式 */
+.combined-screen-layout.app {
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
 }
 
 .combined-grid {
-  display: grid;
-  grid-template-columns: 25% 50% 25%; /* 左：控制+状态，中：视频（大部分），右：3D */
-  grid-template-rows: 40% 60%; /* 上：控制，下：状态 */
+  display: grid !important;
+  grid-template-columns: 25% 50% 25% !important; /* 左：控制+状态，中：视频（大部分），右：3D */
+  grid-template-rows: 40% 60% !important; /* 上：控制，下：状态 */
   gap: 8px;
   padding: 8px;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  position: relative;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  margin: 0 !important;
 }
 
 /* 左上角：主控屏 */
@@ -68,12 +85,15 @@
 
 /* 面板内部内容 */
 .combined-panel .screen {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: transparent;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
 }
 
 .combined-panel .screen-header {
@@ -220,10 +240,13 @@
 
 /* 确保面板内容正确填充 */
 .combined-panel {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
 /* 响应式调整 */

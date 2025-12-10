@@ -152,7 +152,7 @@ export const CombinedScreenLayout: React.FC = () => {
 
   // 已登录且已选择机器人：显示组合布局
   return (
-    <div className="app combined-screen-layout">
+    <div className="combined-screen-layout">
       <div className="combined-grid">
         {/* 左上角：主控屏（Screen0） */}
         <div className="combined-panel combined-panel-control">
