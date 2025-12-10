@@ -129,7 +129,7 @@ class RobotCockpitServer {
         } else {
           return res.status(401).json({
             success: false,
-            message: authResult.message || '用户名或密码错误',
+            message: authResult.message || '手机号或验证码错误',
           });
         }
       } catch (error) {
@@ -231,7 +231,7 @@ class RobotCockpitServer {
 
       // 认证失败
       console.log('[Auth] ❌ 认证失败 - 用户名或密码不匹配');
-        return { success: false, message: '用户名或密码错误' };
+        return { success: false, message: '手机号或验证码错误' };
     } else {
       // 调用真实的远端认证API
       return new Promise((resolve, reject) => {
@@ -375,6 +375,7 @@ class RobotCockpitServer {
   /**
    * 启动单屏模式
    * 只启动一个浏览器窗口，显示单屏Grid布局
+   * 窗口会自动最大化，自适应屏幕大小
    */
   async startSingleScreenMode() {
     console.log('[Server] Launching single screen browser...');
@@ -382,11 +383,11 @@ class RobotCockpitServer {
       screenId: 0,
       url: `${config.screen.frontendUrl}`,
       displayMode: 'single',
-      // 居中显示，尺寸适中
-      x: 100,
-      y: 50,
-      width: 1400,
-      height: 900,
+      // 初始位置和尺寸（会被CDP最大化覆盖）
+      x: 0,
+      y: 0,
+      width: 1920,  // 默认宽度，实际会通过CDP最大化
+      height: 1080, // 默认高度，实际会通过CDP最大化
     });
     console.log('[Server] Single screen launched successfully!');
   }

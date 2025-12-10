@@ -1,7 +1,7 @@
 /**
  * Screen1 - 机器人音视频流展示界面
  * 1号屏（中间）：显示机器人的视频流和音频流
- * - 视频：显示机器人摄像头画面
+ * - 视频：三列布局（左臂视角、主视角、右臂视角）
  * - 音频：播放机器人现场声音
  */
 
@@ -31,14 +31,27 @@ function Screen1({ screenId }: Screen1Props) {
         </div>
       </div>
 
-      <div className="screen-content video-content">
-        {/* 主视频显示区域 */}
-        <div className="main-video-panel">
-          <VideoPlayer screenId={screenId} showControls={true} />
-        </div>
+      <div className="screen-content video-content-multi">
+        {/* 视频流区域：三列布局（与单屏模式一致） */}
+        <section className="view-section-multi">
+          {/* 左侧：左臂视角 */}
+          <div className="view-left-arm-multi">
+            <VideoPlayer compact={true} screenId={0} showControls={true} />
+          </div>
+          
+          {/* 中间：主控视频视角 */}
+          <div className="view-main-multi">
+            <VideoPlayer compact={true} screenId={2} showControls={true} />
+          </div>
+          
+          {/* 右侧：右臂视角 */}
+          <div className="view-right-arm-multi">
+            <VideoPlayer compact={true} screenId={1} showControls={true} />
+          </div>
+        </section>
 
         {/* 音频可视化区域 */}
-        <div className="audio-panel">
+        <div className="audio-panel-multi">
           <AudioPlayer screenId={screenId} />
         </div>
       </div>

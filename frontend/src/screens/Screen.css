@@ -226,6 +226,79 @@
   gap: 20px;
 }
 
+/* Screen1 - 多屏模式视频流布局（与单屏模式一致） */
+.video-content-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+/* 视频流区域：三列布局 */
+.view-section-multi {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 左臂视角 (20%宽度) */
+.view-left-arm-multi {
+  flex: 0 0 20%;
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 主控视频视角 (自适应剩余宽度) */
+.view-main-multi {
+  flex: 1;
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px solid #10b981;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}
+
+/* 右臂视角 (20%宽度) */
+.view-right-arm-multi {
+  flex: 0 0 20%;
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 音频面板（多屏模式） */
+.audio-panel-multi {
+  flex: 0 0 auto;
+  background-color: #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 10px;
+}
+
 .main-video-panel {
   background-color: #2a2a2a;
   border-radius: 12px;

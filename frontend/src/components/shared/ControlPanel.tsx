@@ -58,7 +58,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   // 发送命令 (按下)
   const handleSendCommand = (commandId: string) => {
-    console.log('[ControlPanel] Web按钮按下:', commandId);
     const timestamp = Date.now();
     const command = {
       type: commandId,
@@ -77,7 +76,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     }
     
     // 2. 触发本地3D机器人控制（通过Zustand状态）
-    console.log('[ControlPanel] 调用setCommand:', commandId);
     setCommand(commandId + '_' + timestamp);
     if (onRobotControl) {
       onRobotControl(commandId);

@@ -64,7 +64,7 @@ class WebSocketService extends EventEmitter {
       return;
     }
 
-    console.log(`[WebSocket] Connecting to ${this.serverUrl}...`);
+    // 连接WebSocket
     this.socket = io(this.serverUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -91,7 +91,7 @@ class WebSocketService extends EventEmitter {
     this.socket.on('connect', () => {
       this.isConnectedFlag = true;
       this.reconnectAttempts = 0;
-      console.log('[WebSocket] Connected');
+      // WebSocket已连接
       this.emit('connected');
     });
 
@@ -117,7 +117,7 @@ class WebSocketService extends EventEmitter {
     // 屏幕注册响应
     this.socket.on('screen_registered', (data: { screenId: number; success: boolean; error?: string }) => {
       if (data.success) {
-        console.log(`[WebSocket] Screen ${data.screenId} registered`);
+        // 屏幕已注册
         this.emit('screen_registered', data);
       } else {
         console.error(`[WebSocket] Screen registration failed: ${data.error}`);
@@ -132,29 +132,25 @@ class WebSocketService extends EventEmitter {
 
     // 认证状态变化事件
     this.socket.on('auth_status_change', (data: { isAuthenticated: boolean; username?: string; timestamp: number }) => {
-      console.log('🔔 [WebSocket] Received auth_status_change event from server:', data);
-      console.log('🔔 [WebSocket] Emitting auth_status_change to local listeners');
+      // 收到认证状态变更事件
       this.emit('auth_status_change', data);
     });
 
     // 机器人选择事件
     this.socket.on('robot_selected', (data: { robotId: string; timestamp: number }) => {
-      console.log('🤖 [WebSocket] Received robot_selected event from server:', data);
-      console.log('🤖 [WebSocket] Emitting robot_selected to local listeners');
+      // 收到机器人选择事件
       this.emit('robot_selected', data);
     });
 
     // 用户退出登录事件
     this.socket.on('user_logged_out', (data: { timestamp: number }) => {
-      console.log('🚪 [WebSocket] Received user_logged_out event from server:', data);
-      console.log('🚪 [WebSocket] Emitting user_logged_out to local listeners');
+      // 收到用户登出事件
       this.emit('user_logged_out', data);
     });
 
     // 取消机器人选择事件
     this.socket.on('robot_deselected', (data: { timestamp: number }) => {
-      console.log('🔄 [WebSocket] Received robot_deselected event from server:', data);
-      console.log('🔄 [WebSocket] Emitting robot_deselected to local listeners');
+      // 收到机器人取消选择事件
       this.emit('robot_deselected', data);
     });
   }
@@ -181,7 +177,7 @@ class WebSocketService extends EventEmitter {
     }
 
     this.socket.emit('subscribe_topic', { topic, type });
-    console.log(`[WebSocket] Subscribed to topic: ${topic}`);
+    // 已订阅话题
   }
 
   /**
@@ -194,7 +190,7 @@ class WebSocketService extends EventEmitter {
     }
 
     this.socket.emit('unsubscribe_topic', { topic });
-    console.log(`[WebSocket] Unsubscribed from topic: ${topic}`);
+    // 已取消订阅话题
   }
 
   /**
@@ -228,7 +224,7 @@ class WebSocketService extends EventEmitter {
       this.socket.disconnect();
       this.socket = null;
       this.isConnectedFlag = false;
-      console.log('[WebSocket] Disconnected');
+      // WebSocket已断开
     }
   }
 
@@ -241,7 +237,7 @@ class WebSocketService extends EventEmitter {
       return;
     }
 
-    console.log('[WebSocket] Sending select_robot event to server:', robotId);
+    // 发送选择机器人事件
     this.socket.emit('select_robot', { robotId, timestamp: Date.now() });
   }
 
@@ -254,7 +250,7 @@ class WebSocketService extends EventEmitter {
       return;
     }
 
-    console.log('[WebSocket] Sending logout event to server');
+    // 发送登出事件
     this.socket.emit('user_logout', { timestamp: Date.now() });
   }
 
@@ -267,7 +263,7 @@ class WebSocketService extends EventEmitter {
       return;
     }
 
-    console.log('[WebSocket] Sending deselect_robot event to server');
+    // 发送取消选择机器人事件
     this.socket.emit('deselect_robot', { timestamp: Date.now() });
   }
 

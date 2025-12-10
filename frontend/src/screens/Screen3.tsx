@@ -1,7 +1,8 @@
 /**
  * Screen3 - 3D机器人可视化屏幕
- * 显示行走中的3D人形机器人模型
- * 通过WebSocket接收来自Screen0的控制命令
+ * 显示宇树G1机器人的3D模型
+ * 通过WebSocket接收来自Screen0的控制命令和摇杆控制
+ * 应用与单屏模式一致的控制机制（步行动画、动作控制等）
  */
 
 import { useEffect, useState } from 'react';
@@ -26,6 +27,9 @@ function Screen3({ screenId }: Screen3Props) {
     // 监听连接状态
     const handleConnected = () => {
       setConnected(true);
+      // 订阅3D控制命令话题和移动控制话题
+      websocketService.subscribeTopic('robot_3d_command');
+      websocketService.subscribeTopic('robot_3d_move');
     };
     
     const handleDisconnected = () => {
@@ -47,6 +51,7 @@ function Screen3({ screenId }: Screen3Props) {
     // 订阅3D控制命令话题
     if (websocketService.getStatus().connected) {
       websocketService.subscribeTopic('robot_3d_command');
+      websocketService.subscribeTopic('robot_3d_move');
     }
     
     return () => {
@@ -54,25 +59,26 @@ function Screen3({ screenId }: Screen3Props) {
       websocketService.off('disconnected', handleDisconnected);
       websocketService.off('topic_data', handle3DCommand);
       websocketService.unsubscribeTopic('robot_3d_command');
+      websocketService.unsubscribeTopic('robot_3d_move');
     };
   }, [screenId, setCommand]);
 
   return (
     <div className="screen screen-3">
       <div className="screen-header">
-        <h1>🤖 3D机器人可视化</h1>
+        <h1>🤖 3D机器人可视化（宇树G1）</h1>
         <div className={`status-indicator ${connected ? 'connected' : 'disconnected'}`}>
           {connected ? '已连接' : '未连接'} | Screen {screenId}
         </div>
       </div>
       <div className="screen-content robot-3d-content">
         <Robot3DViewer 
-          width={640}
-          height={1000}
+          width={100}
+          height={100}
           enableAutoRotate={false}
-          showGrid={false}
+          showGrid={true}
           showAxes={false}
-          backgroundColor="#0f172a"
+          backgroundColor="#000011"
         />
       </div>
     </div>

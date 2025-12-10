@@ -133,7 +133,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // 主初始化 - 移除依赖,使用最新的函数引用
   const initializeVideo = useCallback(async () => {
-    console.log('[VideoPlayer] 开始初始化视频流...');
+    // 开始初始化视频流
     setIsVideoLoading(true);
     setVideoError(null);
     
@@ -144,9 +144,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
     
     if (streamRef.current) {
-      console.log('[VideoPlayer] 停止现有视频流轨道');
+      // 停止现有视频流轨道
       streamRef.current.getTracks().forEach(track => {
-        console.log(`[VideoPlayer] 停止轨道: ${track.kind}, ${track.label}`);
         track.stop();
       });
       streamRef.current = null;
@@ -173,11 +172,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         audio: false,
       });
 
-      console.log('[VideoPlayer] 摄像头访问成功,获得流:', stream.id);
+      // 摄像头访问成功
       streamRef.current = stream;
     
       if (videoRef.current) {
-        console.log('[VideoPlayer] 设置video元素srcObject');
+        // 设置video元素srcObject
         videoRef.current.srcObject = stream;
         
         // 确保视频元素准备好
@@ -190,7 +189,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           const video = videoRef.current;
           
           const onLoadedMetadata = () => {
-            console.log('[VideoPlayer] 视频元数据加载完成');
+            // 视频元数据加载完成
             video.removeEventListener('loadedmetadata', onLoadedMetadata);
             resolve();
           };
@@ -204,15 +203,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }, 3000);
         });
         
-        console.log('[VideoPlayer] 开始播放视频');
+        // 开始播放视频
         await videoRef.current.play();
-        console.log('[VideoPlayer] 视频播放成功');
+        // 视频播放成功
       }
 
       const videoTrack = stream.getVideoTracks()[0];
       const settings = videoTrack.getSettings();
       
-      console.log('[VideoPlayer] 摄像头设置:', settings);
+      // 摄像头设置完成
       
       setCameraInfo({
         width: settings.width || 1920,
@@ -224,14 +223,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setUseSimulation(false);
       setIsVideoLoading(false);
       setVideoError(null);
-      console.log('[VideoPlayer] 真实摄像头初始化完成');
+      // 真实摄像头初始化完成
     } catch (error: any) {
       console.error('[VideoPlayer] 摄像头初始化失败,切换到模拟视频:', error);
       console.error('[VideoPlayer] 错误详情:', error?.message, error?.name);
 
   // 初始化模拟视频
       try {
-        console.log('[VideoPlayer] 开始初始化模拟视频');
+        // 开始初始化模拟视频
     const canvas = canvasRef.current;
     if (!canvas) {
           throw new Error('canvas元素未找到');
@@ -247,12 +246,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const stream = canvas.captureStream(30);
     streamRef.current = stream;
-        console.log('[VideoPlayer] 模拟视频流创建成功:', stream.id);
+        // 模拟视频流创建成功
 
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
           await videoRef.current.play();
-          console.log('[VideoPlayer] 模拟视频播放成功');
+          // 模拟视频播放成功
     }
 
     drawSimulatedVideo(ctx, canvas.width, canvas.height);
@@ -267,7 +266,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setUseSimulation(true);
     setIsVideoLoading(false);
     setVideoError(null);
-        console.log('[VideoPlayer] 模拟视频初始化完成');
+        // 模拟视频初始化完成
       } catch (simError: any) {
         console.error('[VideoPlayer] 模拟视频初始化也失败:', simError);
         setVideoError(`视频初始化失败: ${simError?.message || '未知错误'}`);

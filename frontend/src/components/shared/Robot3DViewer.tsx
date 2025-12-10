@@ -61,6 +61,13 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
     leftLegPhase: 0, // 左腿相位
     rightLegPhase: 0, // 右腿相位
   });
+  
+  // 用于存储摇头动画状态
+  const headShakeAnimationRef = useRef({
+    isShaking: false,
+    shakeCycle: 0, // 摇头周期（0-1）
+    shakeDirection: 1, // 摇头方向（1或-1）
+  });
 
   // 获取实际容器尺寸
   const getContainerSize = () => {
@@ -137,8 +144,8 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
 
       // 创建相机 - 调整视角使机器人居中
       const camera = new THREE.PerspectiveCamera(50, actualWidth / actualHeight, 0.1, 1000);
-      camera.position.set(2.5, 1.0, 4.5); // 调整相机位置，使机器人更居中
-      camera.lookAt(0, 0.6, 0); // 看向机器人中心（骨盆位置）
+      camera.position.set(2.5, 0.3, 4.5); // 降低相机高度到0.3，从更低的角度看
+      camera.lookAt(0, 0.4, 0); // 看向机器人脚部附近（y=0.4），确保能看到足部
       cameraRef.current = camera;
 
       // 创建渲染器
@@ -186,26 +193,19 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       // 加载宇树G1机器人URDF模型（包含完整的STL mesh）
       const urdfLoader = new URDFLoader('/models/g1_robot');
       
-      console.log('[Robot3DViewer] 开始加载宇树G1机器人URDF模型...');
+      // 开始加载宇树G1机器人URDF模型
       
       urdfLoader.load('/models/g1_robot/g1_29dof_rev_1_0.urdf')
         .then((robotModel) => {
-          console.log('[Robot3DViewer] URDF模型加载成功，包含STL mesh');
+          // URDF模型加载成功
           
           // 检查所有link，特别关注足部
           const linkNames: string[] = [];
           robotModel.traverse((obj) => {
             if (obj instanceof THREE.Group) {
               linkNames.push(obj.name);
-              if (obj.name.toLowerCase().includes('ankle') || obj.name.toLowerCase().includes('foot')) {
-                console.log(`[Robot3DViewer] 🔍 发现足部link: ${obj.name}, children:`, obj.children.length);
-                obj.children.forEach((child, idx) => {
-                  console.log(`[Robot3DViewer]   - child[${idx}]:`, child.constructor.name, child.name);
-                });
-              }
             }
           });
-          console.log(`[Robot3DViewer] 所有link名称:`, linkNames);
           
           // 调整机器人大小和位置（宇树G1机器人约1.27m高）
           robotModel.scale.set(3, 3, 3); // 放大3倍便于查看
@@ -216,27 +216,101 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           
           // 调整位置：让机器人站在地面上，居中显示
           // 机器人高度约1.27m，原点在骨盆中心（约0.6m高），所以需要抬高0.6m让脚着地
-          robotModel.position.set(0, 0.6, 0);
+          // 地面在y=-0.01，机器人原点在y=0.6，这样脚部在y=0，正好站在地面上
+          robotModel.position.set(0, 1.0, 0);
+          // 确保所有mesh（包括足部）都后渲染，在地面之上
+          robotModel.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.renderOrder = 1; // 所有mesh后渲染
+              // 确保足部mesh可见
+              const childName = child.name.toLowerCase();
+              if (childName.includes('ankle') || childName.includes('foot')) {
+                child.renderOrder = 2; // 足部mesh优先级更高
+                child.material = (child.material as THREE.Material).clone();
+                (child.material as THREE.Material).depthWrite = true;
+                (child.material as THREE.Material).depthTest = true;
+              }
+            }
+          });
+          robotModel.renderOrder = 1; // 机器人后渲染，确保在地面之上
           
           scene.add(robotModel);
           robotGroupRef.current = robotModel;
           
-          console.log('[Robot3DViewer] 机器人已添加到场景');
-          console.log('[Robot3DViewer] 最终rotation:', robotModel.rotation);
-          console.log('[Robot3DViewer] 最终position:', robotModel.position);
+          // 机器人已添加到场景
           
           // 获取关节映射（用于后续动画）
           const jointMap = URDFLoader.getJointMap(robotModel);
           (robotModel as any).jointMap = jointMap;
           
-          console.log(`[Robot3DViewer] 关节数量: ${jointMap.size}`);
+
+          // 设置默认姿态：双臂自然下垂（所有关节角度为0，但肘关节需要特殊处理）
+          // 确保无论单屏还是多屏，默认都是自然下垂状态
+          // 注意：根据URDF定义和代码分析：
+          // - 0度 = 90度弯曲（大臂小臂90度）
+          // - 负值（如-Math.PI/4, -Math.PI/3）= 更弯曲
+          // - 要让大臂小臂在一条直线（180度伸直），需要从90度再转90度
+          // - 根据limit upper=2.0944（约120度），正值方向是伸直方向
+          // - 要让手臂完全伸直，需要设置为正值，约π/2 = 1.5708（90度）
+          const elbowStraightAngle = Math.PI / 2; // π/2 ≈ 1.5708弧度（90度），让大臂小臂在一条直线
+          
+          // 设置所有关节的默认角度
+          const defaultJoints: Array<{ name: string; angle: number }> = [
+            // 左臂所有关节（7个）
+            { name: 'left_shoulder_pitch_joint', angle: 0 },
+            { name: 'left_shoulder_roll_joint', angle: 0 },
+            { name: 'left_shoulder_yaw_joint', angle: 0 },
+            { name: 'left_elbow_joint', angle: elbowStraightAngle }, // 肘关节伸直
+            { name: 'left_wrist_roll_joint', angle: 0 },
+            { name: 'left_wrist_pitch_joint', angle: 0 },
+            { name: 'left_wrist_yaw_joint', angle: 0 },
+            // 右臂所有关节（7个）
+            { name: 'right_shoulder_pitch_joint', angle: 0 },
+            { name: 'right_shoulder_roll_joint', angle: 0 },
+            { name: 'right_shoulder_yaw_joint', angle: 0 },
+            { name: 'right_elbow_joint', angle: elbowStraightAngle }, // 肘关节伸直
+            { name: 'right_wrist_roll_joint', angle: 0 },
+            { name: 'right_wrist_pitch_joint', angle: 0 },
+            { name: 'right_wrist_yaw_joint', angle: 0 },
+            // 左腿关节
+            { name: 'left_hip_pitch_joint', angle: 0 },
+            { name: 'left_hip_roll_joint', angle: 0 },
+            { name: 'left_hip_yaw_joint', angle: 0 },
+            { name: 'left_knee_joint', angle: 0 },
+            { name: 'left_ankle_pitch_joint', angle: 0 },
+            { name: 'left_ankle_roll_joint', angle: 0 },
+            // 右腿关节
+            { name: 'right_hip_pitch_joint', angle: 0 },
+            { name: 'right_hip_roll_joint', angle: 0 },
+            { name: 'right_hip_yaw_joint', angle: 0 },
+            { name: 'right_knee_joint', angle: 0 },
+            { name: 'right_ankle_pitch_joint', angle: 0 },
+            { name: 'right_ankle_roll_joint', angle: 0 },
+            // 腰部关节
+            { name: 'waist_pitch_joint', angle: 0 },
+            { name: 'waist_yaw_joint', angle: 0 },
+            { name: 'waist_roll_joint', angle: 0 }
+          ];
+          
+          let setCount = 0;
+          defaultJoints.forEach(({ name, angle }) => {
+            const joint = jointMap.get(name);
+            if (joint) {
+              URDFLoader.setJointAngle(joint, angle);
+              setCount++;
+            } else {
+              console.log(`[Robot3DViewer] ⚠️ 未找到关节: ${name}`);
+            }
+          });
+          
+          // 已设置默认姿态：双臂自然下垂
 
           // 新增：初始化关节状态管理器（用于实时同步）
           try {
             jointManagerRef.current = new JointStateManager();
             jointManagerRef.current.mapJointsFromScene(robotModel);
             jointManagerRef.current.setInterpolation(true, 0.3); // 启用平滑插值
-            console.log('[Robot3DViewer] 关节状态管理器初始化成功');
+            // 关节状态管理器初始化成功
           } catch (err) {
             console.error('[Robot3DViewer] 关节管理器初始化失败:', err);
           }
@@ -261,9 +335,21 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         // 背景固定不动（不再旋转）
         
         // 根据摇杆输入更新步行动画（不改变位置，只显示动画）
+        // 同时处理摇头动画
         if (robotGroupRef.current) {
           const velocity = moveVelocityRef.current;
           const walkingAnim = walkingAnimationRef.current;
+          const headShakeAnim = headShakeAnimationRef.current;
+          
+          // 处理摇头动画
+          if (headShakeAnim.isShaking) {
+            const shakeSpeed = 3.0; // 摇头速度（周期/秒）
+            headShakeAnim.shakeCycle += shakeSpeed * deltaTime;
+            
+            // 使用正弦波实现左右摆动
+            const shakeAngle = Math.sin(headShakeAnim.shakeCycle * Math.PI * 2) * (Math.PI / 3); // 左右各60度
+            setJointAngle('waist_yaw_joint', shakeAngle);
+          }
           
           // 计算移动速度大小（只考虑前后左右，不考虑转向）
           const speed = Math.sqrt(velocity.linearX * velocity.linearX + velocity.linearY * velocity.linearY);
@@ -462,10 +548,10 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           if (rightAnklePitch) URDFLoader.setJointAngle(rightAnklePitch, 0);
         }
       }
-      console.log('[Robot3DViewer] 🛑 停止移动（立即重置姿态）');
+      // 停止移动
     } else if (hasMovement) {
       walkingAnimationRef.current.isWalking = true;
-      console.log('[Robot3DViewer] ✅ 更新移动速度:', moveVelocityRef.current);
+      // 更新移动速度
     }
   }, [storeMoveVelocity]);
   
@@ -502,12 +588,9 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       commandId = parts[0]; // 只取第一部分
     }
     
-    console.log('[Robot3DViewer] 收到命令:', currentCommand, '-> 解析为:', commandId);
-    
     switch (commandId) {
       case 'left':
         // 左转：旋转机器人（每次都旋转45°）
-        console.log('[Robot3DViewer] 执行左转45°');
         if (robotGroupRef.current) {
           robotGroupRef.current.rotation.z += Math.PI / 4;
         }
@@ -515,7 +598,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         
       case 'right':
         // 右转：旋转机器人（每次都旋转45°）
-        console.log('[Robot3DViewer] 执行右转45°');
         if (robotGroupRef.current) {
           robotGroupRef.current.rotation.z -= Math.PI / 4;
         }
@@ -524,7 +606,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
       case 'forward':
       case 'Running':
         // 前进：让机器人向前移动
-        console.log('[Robot3DViewer] 执行前进');
         if (robotGroupRef.current) {
           // 在当前朝向方向前进0.5个单位
           const direction = new THREE.Vector3(0, 0, -0.5);
@@ -535,7 +616,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         
       case 'backward':
         // 后退：让机器人向后移动
-        console.log('[Robot3DViewer] 执行后退');
         if (robotGroupRef.current) {
           // 在当前朝向方向后退0.5个单位
           const direction = new THREE.Vector3(0, 0, 0.5);
@@ -546,77 +626,80 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         
       case 'Wave':
         // 挥手：抬起右手并摆动
-        console.log('[Robot3DViewer] 执行挥手动作');
+        const waveElbowAngle = -Math.PI / 4; // 弯曲肘部45度
         setJointAngle('right_shoulder_pitch_joint', -Math.PI / 3); // 抬手约60度
         setJointAngle('right_shoulder_roll_joint', Math.PI / 6);  // 外展30度
-        setJointAngle('right_elbow_joint', -Math.PI / 4);         // 弯曲肘部45度
+        setJointAngle('right_shoulder_yaw_joint', 0);  // 右肩不旋转
+        setJointAngle('right_elbow_joint', waveElbowAngle);         // 弯曲肘部45度
         break;
         
       case 'Wave_release':
-        // 挥手松开：重置右手关节
-        console.log('[Robot3DViewer] 重置右手');
+        // 挥手松开：重置右手关节（肘关节伸直）
+        const elbowStraightAngleWave = Math.PI / 2; // π/2 ≈ 1.5708弧度（90度），让大臂小臂在一条直线
         setJointAngle('right_shoulder_pitch_joint', 0);
         setJointAngle('right_shoulder_roll_joint', 0);
-        setJointAngle('right_elbow_joint', 0);
+        setJointAngle('right_elbow_joint', elbowStraightAngleWave); // 肘关节伸直
         break;
         
       case 'ThumbsUp':
-        // 点赞：抬起左手
-        console.log('[Robot3DViewer] 执行点赞动作');
+        // 点赞：平举左手（手臂伸直）
+        const thumbsUpElbowAngle = Math.PI / 2;
         setJointAngle('left_shoulder_pitch_joint', -Math.PI / 2); // 抬手90度
-        setJointAngle('left_shoulder_roll_joint', -Math.PI / 6);  // 内收30度
-        setJointAngle('left_elbow_joint', -Math.PI / 3);          // 弯曲肘部60度
+        setJointAngle('left_shoulder_roll_joint', 0);  // 不内收，保持平举
+        setJointAngle('left_shoulder_yaw_joint', 0);  // 左肩不旋转
+        setJointAngle('left_elbow_joint', thumbsUpElbowAngle);  // 肘关节伸直（平举）
         break;
         
       case 'ThumbsUp_release':
-        // 点赞松开：重置左手关节
-        console.log('[Robot3DViewer] 重置左手');
+        // 点赞松开：重置左手关节（肘关节伸直）
+        const elbowStraightAngleThumbs = Math.PI / 2; // π/2 ≈ 1.5708弧度（90度），让大臂小臂在一条直线
         setJointAngle('left_shoulder_pitch_joint', 0);
         setJointAngle('left_shoulder_roll_joint', 0);
-        setJointAngle('left_elbow_joint', 0);
+        setJointAngle('left_elbow_joint', elbowStraightAngleThumbs); // 肘关节伸直
         break;
         
       case 'WalkJump':
         // 跨栏：抬起右腿
-        console.log('[Robot3DViewer] 执行抬右腿动作');
         setJointAngle('right_hip_pitch_joint', -Math.PI / 3);  // 抬腿60度
         setJointAngle('right_knee_joint', Math.PI / 4);        // 弯曲膝盖45度
         break;
         
       case 'WalkJump_release':
         // 抬右腿松开：重置右腿关节
-        console.log('[Robot3DViewer] 重置右腿');
         setJointAngle('right_hip_pitch_joint', 0);
         setJointAngle('right_knee_joint', 0);
         break;
         
       case 'Jump':
         // 跳跃：抬起左腿
-        console.log('[Robot3DViewer] 执行抬左腿动作');
         setJointAngle('left_hip_pitch_joint', -Math.PI / 3);   // 抬腿60度
         setJointAngle('left_knee_joint', Math.PI / 4);         // 弯曲膝盖45度
         break;
         
       case 'Jump_release':
         // 抬左腿松开：重置左腿关节
-        console.log('[Robot3DViewer] 重置左腿');
         setJointAngle('left_hip_pitch_joint', 0);
         setJointAngle('left_knee_joint', 0);
         break;
         
       case 'reset':
       case 'Idle':
-        // 重置姿态：所有关节归零
-        console.log('[Robot3DViewer] 重置姿态');
+        // 重置姿态：所有关节归零，但肘关节需要特殊处理（设置为伸直状态）
         if (robotGroupRef.current) {
           robotGroupRef.current.rotation.z = 0;
-          robotGroupRef.current.position.set(0, 0.6, 0); // 居中位置
+          robotGroupRef.current.position.set(0, 1.0, 0); // 机器人原点在y=1.0，确保脚部在地面之上 // 机器人原点在y=0.6，脚部在y=0，与地面对齐
           
           // 重置所有主要关节
           const jointMap = (robotGroupRef.current as any).jointMap as Map<string, THREE.Group>;
           if (jointMap) {
-            jointMap.forEach((joint) => {
-              URDFLoader.setJointAngle(joint, 0);
+            const elbowStraightAngle = Math.PI / 2; // π/2 ≈ 1.5708弧度（90度），让大臂小臂在一条直线
+            jointMap.forEach((joint, jointName) => {
+              // 肘关节设置为伸直状态，其他关节设置为0
+              if (jointName === 'left_elbow_joint' || jointName === 'right_elbow_joint') {
+                URDFLoader.setJointAngle(joint, elbowStraightAngle);
+              } else {
+                URDFLoader.setJointAngle(joint, 0);
+              }
             });
           }
         }
@@ -624,37 +707,74 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         
       case 'Bow':
         // 鞠躬：弯腰
-        console.log('[Robot3DViewer] 执行鞠躬动作');
         setJointAngle('waist_pitch_joint', Math.PI / 4); // 向前弯腰45度
         break;
         
       case 'Bow_release':
         // 鞠躬松开：重置腰部
-        console.log('[Robot3DViewer] 重置腰部');
         setJointAngle('waist_pitch_joint', 0);
         break;
         
       case 'RaiseArms':
-        // 双臂举起：同时抬起双臂
-        console.log('[Robot3DViewer] 执行双臂举起动作');
+        // 双臂平举：同时平举双臂（手臂伸直）
+        // 左臂平举
+        const leftElbowAngle = Math.PI / 2;
         setJointAngle('left_shoulder_pitch_joint', -Math.PI / 2);  // 左臂抬起90度
+        setJointAngle('left_shoulder_roll_joint', 0);  // 左肩不侧摆，保持平举
+        setJointAngle('left_shoulder_yaw_joint', 0);  // 左肩不旋转
+        setJointAngle('left_elbow_joint', leftElbowAngle);  // 左肘伸直（平举）
+        
+        // 右臂平举（确保所有关节都设置）
+        const rightElbowAngle = Math.PI / 2;
         setJointAngle('right_shoulder_pitch_joint', -Math.PI / 2); // 右臂抬起90度
-        setJointAngle('left_elbow_joint', -Math.PI / 6);          // 左肘弯曲30度
-        setJointAngle('right_elbow_joint', -Math.PI / 6);         // 右肘弯曲30度
+        setJointAngle('right_shoulder_roll_joint', 0); // 右肩不侧摆，保持平举
+        setJointAngle('right_shoulder_yaw_joint', 0); // 右肩不旋转
+        setJointAngle('right_elbow_joint', rightElbowAngle); // 右肘伸直（平举）
         break;
         
       case 'RaiseArms_release':
-        // 双臂举起松开：重置双臂
-        console.log('[Robot3DViewer] 重置双臂');
+        // 双臂举起松开：重置双臂（包括所有手臂关节，确保完全自然下垂）
+        // 肘关节需要设置为正值才能让大臂小臂在一条直线
+        const elbowStraightAngle = Math.PI / 2; // π/2 ≈ 1.5708弧度（90度），让大臂小臂在一条直线
         setJointAngle('left_shoulder_pitch_joint', 0);
+        setJointAngle('left_shoulder_roll_joint', 0);
+        setJointAngle('left_shoulder_yaw_joint', 0);
+        setJointAngle('left_elbow_joint', elbowStraightAngle); // 肘关节伸直
+        setJointAngle('left_wrist_roll_joint', 0);
+        setJointAngle('left_wrist_pitch_joint', 0);
+        setJointAngle('left_wrist_yaw_joint', 0);
         setJointAngle('right_shoulder_pitch_joint', 0);
-        setJointAngle('left_elbow_joint', 0);
-        setJointAngle('right_elbow_joint', 0);
+        setJointAngle('right_shoulder_roll_joint', 0);
+        setJointAngle('right_shoulder_yaw_joint', 0);
+        setJointAngle('right_elbow_joint', elbowStraightAngle); // 肘关节伸直
+        setJointAngle('right_wrist_roll_joint', 0);
+        setJointAngle('right_wrist_pitch_joint', 0);
+        setJointAngle('right_wrist_yaw_joint', 0);
+        break;
+        
+      case 'RaiseRightArm':
+        // 右臂平举：只平举右臂（手臂伸直）
+        const rightArmElbowAngle = Math.PI / 2;
+        setJointAngle('right_shoulder_pitch_joint', -Math.PI / 2); // 右臂抬起90度
+        setJointAngle('right_shoulder_roll_joint', 0); // 右肩不侧摆，保持平举
+        setJointAngle('right_shoulder_yaw_joint', 0); // 右肩不旋转
+        setJointAngle('right_elbow_joint', rightArmElbowAngle); // 右肘伸直（平举）
+        break;
+        
+      case 'RaiseRightArm_release':
+        // 右臂举起松开：重置右臂（包括所有右臂关节，确保完全自然下垂）
+        const rightArmElbowStraightAngle = Math.PI / 2; // π/2 ≈ 1.5708弧度（90度），让大臂小臂在一条直线
+        setJointAngle('right_shoulder_pitch_joint', 0);
+        setJointAngle('right_shoulder_roll_joint', 0);
+        setJointAngle('right_shoulder_yaw_joint', 0);
+        setJointAngle('right_elbow_joint', rightArmElbowStraightAngle); // 肘关节伸直
+        setJointAngle('right_wrist_roll_joint', 0);
+        setJointAngle('right_wrist_pitch_joint', 0);
+        setJointAngle('right_wrist_yaw_joint', 0);
         break;
         
       case 'Squat':
         // 下蹲：弯曲双腿
-        console.log('[Robot3DViewer] 执行下蹲动作');
         setJointAngle('left_hip_pitch_joint', Math.PI / 3);   // 左髋弯曲60度
         setJointAngle('right_hip_pitch_joint', Math.PI / 3);  // 右髋弯曲60度
         setJointAngle('left_knee_joint', -Math.PI / 3);       // 左膝弯曲60度
@@ -663,7 +783,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         
       case 'Squat_release':
         // 下蹲松开：重置双腿
-        console.log('[Robot3DViewer] 重置双腿');
         setJointAngle('left_hip_pitch_joint', 0);
         setJointAngle('right_hip_pitch_joint', 0);
         setJointAngle('left_knee_joint', 0);
@@ -671,24 +790,26 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         break;
         
       case 'TurnHead':
-        // 转头：转动腰部（模拟转头）
-        console.log('[Robot3DViewer] 执行转头动作');
-        setJointAngle('waist_yaw_joint', Math.PI / 4); // 向左转45度
+        // 摇头：启动摇头动画（左右摆动）
+        headShakeAnimationRef.current.isShaking = true;
+        headShakeAnimationRef.current.shakeCycle = 0;
+        headShakeAnimationRef.current.shakeDirection = 1;
         break;
         
       case 'TurnHead_release':
-        // 转头松开：重置腰部
-        console.log('[Robot3DViewer] 重置腰部旋转');
+        // 摇头松开：停止摇头并重置腰部
+        headShakeAnimationRef.current.isShaking = false;
+        headShakeAnimationRef.current.shakeCycle = 0;
         setJointAngle('waist_yaw_joint', 0);
         break;
         
       case 'move':
         // 移动命令 - 不做任何处理，移动由动画循环中的速度更新处理
-        // 这个case只是为了避免"未知命令"的日志
         break;
         
       default:
-        console.log(`[Robot3DViewer] 未知命令: ${commandId}`);
+        // 未知命令 - 静默忽略
+        break;
     }
   }, [currentCommand]);
 

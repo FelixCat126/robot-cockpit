@@ -36,44 +36,52 @@ export const SingleScreenLayout: React.FC = () => {
     // 检查初始认证状态
     checkAuthRef.current();
     
-    // 窗口自动最大化（非全屏）
+    // 窗口自动最大化（非全屏）- 改进版，更可靠
+    // 注意：后端已通过CDP设置窗口最大化，前端代码作为备用方案
     const maximizeWindow = () => {
       // 获取屏幕可用尺寸（排除任务栏等）
       const screenWidth = window.screen.availWidth;
       const screenHeight = window.screen.availHeight;
       
-      // 设置窗口大小和位置
-      try {
-        // 使用window.resizeTo和window.moveTo（需要浏览器允许）
-        // 注意：某些浏览器可能限制窗口大小调整，需要用户交互后才能调整
-        window.resizeTo(screenWidth, screenHeight);
-        window.moveTo(0, 0);
-        console.log(`[SingleScreenLayout] ✅ 窗口已最大化: ${screenWidth}x${screenHeight}`);
-      } catch (error) {
-        // 如果浏览器不允许，尝试使用window.innerWidth/innerHeight
-        console.log('[SingleScreenLayout] 无法直接调整窗口大小，使用CSS自适应');
+      // 检查当前窗口大小
+      const currentWidth = window.outerWidth || window.innerWidth;
+      const currentHeight = window.outerHeight || window.innerHeight;
+      
+      // 如果窗口已经接近最大化，不需要再次调整
+      if (Math.abs(currentWidth - screenWidth) < 50 && Math.abs(currentHeight - screenHeight) < 50) {
+        return;
       }
       
-      // 如果窗口大小没有变化，尝试多次调整（某些浏览器需要多次调用）
-      const checkAndRetry = () => {
-        const currentWidth = window.outerWidth || window.innerWidth;
-        const currentHeight = window.outerHeight || window.innerHeight;
-        
-        // 如果窗口大小明显小于屏幕大小，再次尝试
-        if (currentWidth < screenWidth * 0.9 || currentHeight < screenHeight * 0.9) {
-          try {
-            window.resizeTo(screenWidth, screenHeight);
-            window.moveTo(0, 0);
-            console.log(`[SingleScreenLayout] 🔄 重试窗口最大化: ${screenWidth}x${screenHeight}`);
-          } catch (e) {
-            // 忽略错误
-          }
+      // 设置窗口大小和位置（备用方案，如果后端CDP失败）
+      const tryMaximize = () => {
+        try {
+          // 先移动到左上角
+          window.moveTo(0, 0);
+          // 然后调整大小到屏幕尺寸
+          window.resizeTo(screenWidth, screenHeight);
+          
+          const newWidth = window.outerWidth || window.innerWidth;
+          const newHeight = window.outerHeight || window.innerHeight;
+          
+          
+          // 如果调整成功，返回true
+          return Math.abs(newWidth - screenWidth) < 50 && Math.abs(newHeight - screenHeight) < 50;
+        } catch (error) {
+          console.warn('[SingleScreenLayout] 窗口调整失败（浏览器可能限制）:', error);
+          return false;
         }
       };
       
-      // 延迟检查并重试
-      setTimeout(checkAndRetry, 200);
-      setTimeout(checkAndRetry, 500);
+      // 延迟尝试（给后端CDP时间先执行）
+      setTimeout(() => {
+        const currentWidth2 = window.outerWidth || window.innerWidth;
+        const currentHeight2 = window.outerHeight || window.innerHeight;
+        
+        // 如果窗口还没有最大化，尝试前端方法
+        if (Math.abs(currentWidth2 - screenWidth) > 50 || Math.abs(currentHeight2 - screenHeight) > 50) {
+          tryMaximize();
+        }
+      }, 500); // 延迟500ms，等待后端CDP执行
     };
     
     // 延迟执行，确保DOM已加载
@@ -84,18 +92,14 @@ export const SingleScreenLayout: React.FC = () => {
       maximizeWindow();
     } else {
       window.addEventListener('load', maximizeWindow);
+      // 也监听DOMContentLoaded
+      document.addEventListener('DOMContentLoaded', maximizeWindow);
     }
     
-    // 监听窗口大小变化，确保布局自适应
-    const handleResize = () => {
-      // 触发重新布局
-      window.dispatchEvent(new Event('resize'));
-    };
-    
-    window.addEventListener('resize', handleResize);
-    
+    // 清理函数：移除事件监听器
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('load', maximizeWindow);
+      document.removeEventListener('DOMContentLoaded', maximizeWindow);
     };
   }, []);
   
@@ -314,7 +318,7 @@ export const SingleScreenLayout: React.FC = () => {
               enableAutoRotate={true}
               showGrid={true}
               showAxes={false}
-              backgroundColor="#1a1a2e"
+              backgroundColor="#000011"
             />
           </div>
         </section>

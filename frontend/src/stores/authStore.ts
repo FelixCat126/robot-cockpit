@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ 
           isAuthenticated: false, 
           isLoading: false, 
-          error: result.message || '登录失败' 
+          error: result.message || '手机号或验证码错误' 
         });
         return false;
       }
@@ -59,7 +59,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ 
         isAuthenticated: false, 
         isLoading: false, 
-        error: error.message || '登录时发生错误' 
+        error: error.message || '手机号或验证码错误' 
       });
       return false;
     }

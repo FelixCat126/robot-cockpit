@@ -81,8 +81,8 @@ function LoginPage({ screenId: _, isInputEnabled }: LoginPageProps) {
     <div className="login-page">
       <div className="login-container">
         <div className="login-header">
-          <h1>Robot Cockpit</h1>
-          <p>机器人驾驶舱系统</p>
+          <h1>麦擎科技机器人智能座舱系统</h1>
+          <p>Robot Cockpit</p>
         </div>
 
         <div className="login-content">

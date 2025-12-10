@@ -88,10 +88,6 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         
         // 调试日志：显示所有轴的状态（每100ms打印一次）
         const now = Date.now();
-        if (now - lastSendTimeRef.current >= sendIntervalMs) {
-          console.log(`[PeripheralController] 🎮 摇杆状态 - 轴[${event.axis.index}]: ${event.axis.value.toFixed(3)}, 所有轴:`, 
-            Object.keys(axisStateRef.current).map(idx => `[${idx}]=${axisStateRef.current[parseInt(idx)].toFixed(3)}`).join(', '));
-        }
         
         // 立即处理速度更新（不节流），确保松开时立即停止
         // 合并所有轴的值发送命令（支持多向运动）
@@ -127,12 +123,6 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         if (now - lastSendTimeRef.current >= sendIntervalMs) {
           lastSendTimeRef.current = now;
           
-          // 调试日志：显示计算出的速度
-          if (hasInput) {
-            console.log(`[PeripheralController] 🚀 移动速度 - linearX: ${linearX.toFixed(3)}, linearY: ${linearY.toFixed(3)}, angularZ: ${angularZ.toFixed(3)}`);
-          } else if (isMovingRef.current) {
-            console.log(`[PeripheralController] 🛑 摇杆松开，停止移动`);
-          }
           
           // 根据线速度和角速度决定动画（考虑多向运动）
           const totalSpeed = Math.sqrt(linearX * linearX + linearY * linearY + angularZ * angularZ);
@@ -160,13 +150,13 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           
           // 发送实时移动控制命令（用于URDF模型的位置控制，支持多向运动）
           // 无论是否有输入，都要发送移动数据（包括停止命令）
-          const moveCommand = {
-            command: 'move',
-            linearX: linearX,
+            const moveCommand = {
+              command: 'move',
+              linearX: linearX,
             linearY: linearY,
-            angularZ: angularZ,
-            timestamp: Date.now()
-          };
+              angularZ: angularZ,
+              timestamp: Date.now()
+            };
           
           // 发送到WebSocket（用于ROS2后端）
           publishRef.current('robot_3d_move', moveCommand, 'std_msgs/String');
@@ -207,10 +197,8 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         // 防抖检查：如果距离上次触发时间太短，忽略
         if (lastButtonTimeRef.current[buttonIndex] && 
             now - lastButtonTimeRef.current[buttonIndex] < buttonDebounceMs) {
-          console.log(`[PeripheralController] 按钮${buttonIndex}防抖过滤（距上次${now - lastButtonTimeRef.current[buttonIndex]}ms）`);
           return;
         }
-        console.log(`[PeripheralController] 按钮${buttonIndex}按下`);
         lastButtonTimeRef.current[buttonIndex] = now;
         
         let command3D: string | null = null;
@@ -219,7 +207,7 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         const timestamp = Date.now();
         
         if (buttonIndex === 0) {
-          command3D = 'Wave';  // 按钮A - 挥手
+          command3D = 'RaiseRightArm';  // 按钮A - 右臂平举
           setCommandRef.current(command3D + '_' + timestamp);
         } else if (buttonIndex === 1) {
           command3D = 'ThumbsUp';  // 按钮B - 点赞
@@ -267,8 +255,8 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           // 跳过后续的广播逻辑
           command3D = null;
         } else if (buttonIndex === 6) {
-          // 按钮6 - 双臂举起（新增动作）
-          command3D = 'RaiseArms';
+          // 按钮6 - 摇头动作
+          command3D = 'TurnHead';
           setCommandRef.current(command3D + '_' + timestamp);
         }
         
@@ -283,7 +271,6 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         }
       } else if (event.type === 'button_up' && event.button) {
         const buttonIndex = event.button.index;
-        console.log(`[PeripheralController] 按钮${buttonIndex}松开`);
         
         // 处理按钮松开事件 - 重置对应的关节
         if (buttonIndex >= 0 && buttonIndex <= 6) {
@@ -291,7 +278,7 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           let releaseCommand: string | null = null;
           
           if (buttonIndex === 0) {
-            releaseCommand = 'Wave_release';  // 按钮A松开 - 重置右手
+            releaseCommand = 'RaiseRightArm_release';  // 按钮A松开 - 重置右臂
           } else if (buttonIndex === 1) {
             releaseCommand = 'ThumbsUp_release';  // 按钮B松开 - 重置左手
           } else if (buttonIndex === 2) {
@@ -299,7 +286,7 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           } else if (buttonIndex === 3) {
             releaseCommand = 'Jump_release';  // 按钮D松开 - 重置左腿
           } else if (buttonIndex === 6) {
-            releaseCommand = 'RaiseArms_release';  // 按钮6松开 - 重置双臂
+            releaseCommand = 'TurnHead_release';  // 按钮6松开 - 重置头部（腰部）
           }
           
           if (releaseCommand) {
@@ -320,13 +307,13 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
     // 监听管理器启动
     manager.on('started', () => {
       setIsActive(true);
-      console.log('[PeripheralController] 外设控制系统已启动');
+      // 外设控制系统已启动
     });
 
     // 监听管理器停止
     manager.on('stopped', () => {
       setIsActive(false);
-      console.log('[PeripheralController] 外设控制系统已停止');
+      // 外设控制系统已停止
     });
 
     // 监听设备错误
@@ -339,7 +326,7 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
     const startWithRetry = () => {
       manager.start()
         .then(() => {
-          console.log('[PeripheralController] 启动成功');
+          // 启动成功
           setError(null);
           // 清除重试定时器
           if (retryTimerRef.current) {
@@ -359,7 +346,6 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           
           // 5秒后重试
           retryTimerRef.current = setTimeout(() => {
-            console.log('[PeripheralController] 重试连接外设...');
             startWithRetry();
           }, 5000);
         });
@@ -370,7 +356,7 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
 
     // 清理
     return () => {
-      console.log('[PeripheralController] 清理资源...');
+      // 清理资源
       // 清除重试定时器
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);

@@ -19,7 +19,7 @@ function App() {
     const urlDisplayMode = urlParams.get('displayMode');
     
     if (urlDisplayMode === 'single' || urlDisplayMode === 'multi') {
-      console.log('[App] Using URL param displayMode:', urlDisplayMode);
+      // 使用URL参数displayMode
       setDisplayMode(urlDisplayMode);
       setConfigLoading(false);
       return;
@@ -28,27 +28,27 @@ function App() {
     // 方法2：如果URL中有screen参数，说明是多屏模式
     const screenParam = urlParams.get('screen');
     if (screenParam !== null) {
-      console.log('[App] Detected screen param, using multi-screen mode');
+      // 检测到screen参数，使用多屏模式
       setDisplayMode('multi');
       setConfigLoading(false);
       return;
     }
     
-    console.log('[App] No URL params found, fetching from API...');
+    // 未找到URL参数，从API获取
     
     // 降级：通过API获取
     const fetchDisplayMode = async () => {
       try {
-        console.log('[App] Fetching display mode from backend API...');
+        // 从后端API获取显示模式
         const response = await fetch('/api/config/display-mode');
-        console.log('[App] Response status:', response.status, response.statusText);
+        // 获取显示模式配置
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
-        console.log('[App] Display mode config:', data);
+        // 显示模式配置已加载
         setDisplayMode(data.mode);
         setConfigLoading(false);
       } catch (error) {

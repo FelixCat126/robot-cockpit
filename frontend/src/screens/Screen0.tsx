@@ -22,12 +22,12 @@ function Screen0({ screenId, onDeselectRobot }: Screen0Props) {
     // 监听WebSocket连接状态
     const handleConnected = () => {
       setConnected(true);
-      console.log('[Screen0] WebSocket已连接');
+      // WebSocket已连接
     };
     
     const handleDisconnected = () => {
       setConnected(false);
-      console.log('[Screen0] WebSocket已断开');
+      // WebSocket已断开
     };
     
     websocketService.on('connected', handleConnected);
@@ -45,7 +45,7 @@ function Screen0({ screenId, onDeselectRobot }: Screen0Props) {
   }, []);
 
   const handleLogout = () => {
-    console.log('[Screen0] Logout clicked');
+    // 登出
     logout();
   };
 

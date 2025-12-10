@@ -44,14 +44,14 @@ class AuthService {
       } else {
         return { 
           success: false, 
-          message: data.message || `登录失败: ${response.status}` 
+          message: data.message || '手机号或验证码错误' 
         };
       }
     } catch (error: any) {
       console.error('Login error:', error);
       return { 
         success: false, 
-        message: error.message || '网络错误，请检查连接' 
+        message: '手机号或验证码错误' 
       };
     }
   }

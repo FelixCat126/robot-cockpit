@@ -353,6 +353,52 @@ class ScreenManager extends EventEmitter {
         timeout: 30000,
       });
 
+      // 使用CDP协议设置窗口为最大化（参考多屏模式的实现）
+      try {
+        const client = await page.target().createCDPSession();
+        const windowId = await client.send('Browser.getWindowForTarget', {
+          targetId: page.target()._targetId
+        });
+        
+        // 获取屏幕可用尺寸
+        const screenInfo = await page.evaluate(() => {
+          return {
+            availWidth: window.screen.availWidth,
+            availHeight: window.screen.availHeight,
+            width: window.screen.width,
+            height: window.screen.height
+          };
+        });
+        
+        // 设置窗口为最大化（使用maximized状态，而不是fullscreen，避免ESC提示）
+        await client.send('Browser.setWindowBounds', {
+          windowId: windowId.windowId,
+          bounds: {
+            windowState: 'maximized',  // 最大化窗口，自适应屏幕大小
+          }
+        });
+        
+        this.log('info', `[Single Screen] Window maximized: ${screenInfo.availWidth}x${screenInfo.availHeight}`);
+      } catch (e) {
+        this.log('warn', `Could not maximize window using CDP: ${e.message}, falling back to manual resize`);
+        // 降级方案：通过页面脚本尝试最大化
+        try {
+          await page.evaluate(() => {
+            // 尝试使用window.resizeTo（可能被浏览器限制）
+            const screenWidth = window.screen.availWidth;
+            const screenHeight = window.screen.availHeight;
+            try {
+              window.resizeTo(screenWidth, screenHeight);
+              window.moveTo(0, 0);
+            } catch (err) {
+              console.log('Window resize restricted by browser:', err);
+            }
+          });
+        } catch (e2) {
+          this.log('warn', `Fallback resize also failed: ${e2.message}`);
+        }
+      }
+
       // 存储浏览器实例
       this.browsers.set(screenId, browser);
 
