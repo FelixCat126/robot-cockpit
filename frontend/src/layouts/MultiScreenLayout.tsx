@@ -74,14 +74,33 @@ export const MultiScreenLayout: React.FC = () => {
       if (e.key === 'robot_cockpit_logged_in' || e.key === 'robot_cockpit_auth_updated') {
         checkAuthRef.current();
       }
+      if (e.key === 'robot_cockpit_selected_robot' || e.key === 'robot_cockpit_robot_updated') {
+        const saved = localStorage.getItem('robot_cockpit_selected_robot');
+        setSelectedRobotId(saved || null);
+      }
     };
     
     window.addEventListener('storage', handleStorageChange);
+    
+    // 监听自定义事件（同一窗口内的同步）
+    const handleAuthUpdate = () => {
+      checkAuthRef.current();
+    };
+    
+    const handleRobotUpdate = () => {
+      const saved = localStorage.getItem('robot_cockpit_selected_robot');
+      setSelectedRobotId(saved || null);
+    };
+    
+    window.addEventListener('robot_cockpit_auth_update', handleAuthUpdate);
+    window.addEventListener('robot_cockpit_robot_update', handleRobotUpdate);
     
     const handleRobotSelected = (data: { robotId: string; timestamp: number }) => {
       setSelectedRobotId(() => data.robotId);
       localStorage.setItem('robot_cockpit_selected_robot', data.robotId);
       localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
+      // 触发自定义事件，通知同窗口内的其他组件
+      window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
     };
 
     const handleUserLoggedOut = () => {
@@ -92,6 +111,10 @@ export const MultiScreenLayout: React.FC = () => {
       localStorage.removeItem('robot_cockpit_token');
       localStorage.setItem('robot_cockpit_auth_updated', Date.now().toString());
       
+      // 触发自定义事件，通知同窗口内的其他组件
+      window.dispatchEvent(new CustomEvent('robot_cockpit_auth_update'));
+      window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
+      
       checkAuthRef.current();
     };
 
@@ -99,6 +122,8 @@ export const MultiScreenLayout: React.FC = () => {
       setSelectedRobotId(null);
       localStorage.removeItem('robot_cockpit_selected_robot');
       localStorage.removeItem('robot_cockpit_robot_updated');
+      // 触发自定义事件，通知同窗口内的其他组件
+      window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
     };
 
     websocketService.on('robot_selected', handleRobotSelected);
@@ -109,6 +134,8 @@ export const MultiScreenLayout: React.FC = () => {
       websocketService.off('connected', handleConnected);
       websocketService.off('auth_status_change', handleAuthStatusChange);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('robot_cockpit_auth_update', handleAuthUpdate);
+      window.removeEventListener('robot_cockpit_robot_update', handleRobotUpdate);
       websocketService.off('robot_selected', handleRobotSelected);
       websocketService.off('user_logged_out', handleUserLoggedOut);
       websocketService.off('robot_deselected', handleRobotDeselected);
@@ -146,7 +173,12 @@ export const MultiScreenLayout: React.FC = () => {
     setSelectedRobotId(null);
     localStorage.removeItem('robot_cockpit_selected_robot');
     localStorage.removeItem('robot_cockpit_robot_updated');
+    
+    // 发送取消选择事件到后端（会广播到所有屏幕）
     websocketService.deselectRobot();
+    
+    // 触发自定义事件，通知同窗口内的其他组件（备用机制）
+    window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
   };
 
   const renderScreen = () => {
