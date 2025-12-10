@@ -12,8 +12,8 @@
 
 .combined-grid {
   display: grid;
-  grid-template-columns: 25% 50% 25%; /* 左：控制+状态，中：视频，右：3D */
-  grid-template-rows: 40% 60%; /* 上：控制，下：状态 */
+  grid-template-columns: 22% 58% 20%; /* 左：控制+状态，中：视频（大部分），右：3D */
+  grid-template-rows: 38% 62%; /* 上：控制，下：状态 */
   gap: 8px;
   padding: 8px;
   width: 100%;
