@@ -7,6 +7,8 @@ import { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { getIcon } from '../ControlIcons';
 import { useRobot3DStore } from '../../stores/robot3DStore';
+import { PeripheralController } from './PeripheralController';
+import { RobotCommand } from '../../types/peripheral.types';
 import './CompactStyles.css';
 
 interface ControlPanelProps {
@@ -24,7 +26,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   compact = false,
   className = '',
   onRobotControl,
-  enablePeripherals: _enablePeripherals = false, // 前缀下划线表示有意未使用
+  enablePeripherals = false, // 单屏模式启用，多屏模式在Screen0顶层已渲染
   connected: externalConnected,
   publish: externalPublish,
 }) => {
@@ -40,6 +42,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const [selectedCommand, setSelectedCommand] = useState<string>('');
   const { setCommand } = useRobot3DStore();
 
+  // 处理外设命令（单屏模式使用）
+  const handlePeripheralCommand = (_cmd: RobotCommand) => {
+    // 外设命令已通过PeripheralController内部处理
+    // 这里可以添加额外的处理逻辑（如果需要）
+  };
 
   // 控制命令列表 - 只保留基本功能
   const commandCategories = [
@@ -85,7 +92,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   return (
     <div className={`control-panel ${compact ? 'compact' : ''} ${className}`}>
-      {/* 注意：PeripheralController 已移至 Screen0 顶层，无需在此渲染 */}
+      {/* 单屏模式：在ControlPanel中渲染PeripheralController */}
+      {/* 多屏模式：enablePeripherals=false，PeripheralController在Screen0顶层渲染 */}
+      {enablePeripherals && (
+        <PeripheralController 
+          enabled={true} 
+          onCommandSent={handlePeripheralCommand}
+          onManagerReady={() => {}}
+        />
+      )}
 
       <div className="control-content">
         {commandCategories.map((category) => (
