@@ -169,7 +169,8 @@ class WebSocketService extends EventEmitter {
     if (topic === '/robot/audio/stream' || 
         topic.includes('/audio/') || 
         topic.includes('/video/') ||
-        topic === 'robot_3d_command') {
+        topic === 'robot_3d_command' ||
+        topic === 'robot_3d_move') {
       this.log('debug', `Broadcasting real-time data for topic: ${topic}`);
       this.broadcastTopicData(topic, message);
     }

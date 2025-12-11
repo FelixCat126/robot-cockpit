@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react';
 import websocketService from '../services/websocket';
 import { useAuthStore } from '../stores/authStore';
 import { ControlPanel } from '../components/shared/ControlPanel';
+import { PeripheralController } from '../components/shared/PeripheralController';
+import { RobotCommand } from '../types/peripheral.types';
 import Screen1 from './Screen1';
 import Screen2 from './Screen2';
 import Screen3 from './Screen3';
@@ -67,6 +69,12 @@ function Screen0({ screenId, onDeselectRobot, isViewingOtherScreen = false }: Sc
     setViewingScreen(null);
   };
 
+  // 处理外设命令（_cmd 前缀下划线表示参数有意未使用）
+  const handlePeripheralCommand = (_cmd: RobotCommand) => {
+    // 外设命令已通过PeripheralController内部处理
+    // 这里可以添加额外的处理逻辑（如果需要）
+  };
+
   // 如果正在查看其他屏幕，显示该屏幕的内容
   if (viewingScreen !== null) {
     const screenComponents: Record<number, React.ReactNode> = {
@@ -77,6 +85,13 @@ function Screen0({ screenId, onDeselectRobot, isViewingOtherScreen = false }: Sc
 
     return (
       <div className="screen screen-0 screen-viewing-other">
+        {/* 外设控制器 - 始终保持挂载，不受视图切换影响 */}
+        <PeripheralController 
+          enabled={true} 
+          onCommandSent={handlePeripheralCommand}
+          onManagerReady={() => {}}
+        />
+        
         <div className="screen-header">
           <div className="header-left">
             <h1>
@@ -115,6 +130,13 @@ function Screen0({ screenId, onDeselectRobot, isViewingOtherScreen = false }: Sc
   // 默认显示控制面板
   return (
     <div className="screen screen-0">
+      {/* 外设控制器 - 始终保持挂载，不受视图切换影响 */}
+      <PeripheralController 
+        enabled={true} 
+        onCommandSent={handlePeripheralCommand}
+        onManagerReady={() => {}}
+      />
+      
       <div className="screen-header">
         <div className="header-left">
           <h1>🎮 机器人控制中心</h1>
@@ -168,7 +190,7 @@ function Screen0({ screenId, onDeselectRobot, isViewingOtherScreen = false }: Sc
 
         <ControlPanel 
           screenId={screenId}
-          enablePeripherals={true}
+          enablePeripherals={false}
           connected={connected}
           publish={publish}
         />

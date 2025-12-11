@@ -17,7 +17,7 @@ interface Screen3Props {
 
 function Screen3({ screenId }: Screen3Props) {
   const [connected, setConnected] = useState(false);
-  const { setCommand } = useRobot3DStore();
+  const { setCommand, setMoveVelocity } = useRobot3DStore();
 
   useEffect(() => {
     // 连接WebSocket
@@ -41,6 +41,17 @@ function Screen3({ screenId }: Screen3Props) {
       if (data && data.topic === 'robot_3d_command' && data.data && data.data.command) {
         // 添加时间戳确保相同命令也能触发（关键修复！）
         setCommand(data.data.command + '_' + Date.now());
+      } else if (data && data.topic === 'robot_3d_move' && data.data) {
+        // 在多屏模式下，Screen3可能在不同的浏览器窗口中，store实例是独立的
+        // 必须通过WebSocket同步moveVelocity，确保摇杆输入能传递到Screen3
+        const moveData = data.data;
+        if (moveData.linearX !== undefined || moveData.linearY !== undefined || moveData.angularZ !== undefined) {
+          setMoveVelocity({
+            linearX: moveData.linearX || 0,
+            linearY: moveData.linearY || 0,
+            angularZ: moveData.angularZ || 0
+          });
+        }
       }
     };
     
@@ -61,7 +72,7 @@ function Screen3({ screenId }: Screen3Props) {
       websocketService.unsubscribeTopic('robot_3d_command');
       websocketService.unsubscribeTopic('robot_3d_move');
     };
-  }, [screenId, setCommand]);
+  }, [screenId, setCommand, setMoveVelocity]);
 
   return (
     <div className="screen screen-3">

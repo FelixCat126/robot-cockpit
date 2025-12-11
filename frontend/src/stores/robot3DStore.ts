@@ -47,7 +47,7 @@ export const useRobot3DStore = create<Robot3DState>((set) => ({
   setDirection: (direction) => set({ direction }),
   setIsMoving: (isMoving) => set({ isMoving }),
   setVelocity: (velocity) => set({ velocity }),
-  setMoveVelocity: (velocity) => set({ moveVelocity: velocity }), // 新增
+  setMoveVelocity: (velocity) => set({ moveVelocity: { ...velocity } }), // 确保创建新对象
   reset: () => set({
     currentCommand: null,
     speed: 1.0,

@@ -39,8 +39,12 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // 从全局状态获取控制指令和移动速度
-  const { currentCommand, moveVelocity: storeMoveVelocity } = useRobot3DStore();
+  // 从全局状态获取控制指令和移动速度（使用选择器确保正确订阅）
+  const currentCommand = useRobot3DStore((state) => state.currentCommand);
+  // 分别订阅每个属性，确保任何变化都能触发更新
+  const linearX = useRobot3DStore((state) => state.moveVelocity.linearX);
+  const linearY = useRobot3DStore((state) => state.moveVelocity.linearY);
+  const angularZ = useRobot3DStore((state) => state.moveVelocity.angularZ);
 
   // 新增：关节状态管理器
   const jointManagerRef = useRef<JointStateManager>();
@@ -337,7 +341,14 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         // 根据摇杆输入更新步行动画（不改变位置，只显示动画）
         // 同时处理摇头动画
         if (robotGroupRef.current) {
-          const velocity = moveVelocityRef.current;
+          // 在动画循环中，直接从store获取最新值（不依赖ref，确保立即响应）
+          // 这是关键：每帧都直接从store读取，确保松开摇杆后立即检测到0值
+          const storeState = useRobot3DStore.getState();
+          const velocity = storeState.moveVelocity;
+          
+          // 同步更新ref（用于其他地方）
+          moveVelocityRef.current = { ...velocity };
+          
           const walkingAnim = walkingAnimationRef.current;
           const headShakeAnim = headShakeAnimationRef.current;
           
@@ -355,17 +366,60 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           const speed = Math.sqrt(velocity.linearX * velocity.linearX + velocity.linearY * velocity.linearY);
           const hasMovement = speed > 0.01; // 只检查线速度，不检查角速度
           
-          if (hasMovement) {
+          // 如果没有移动输入，立即停止并重置姿态（优先级最高，确保立即停止）
+          if (!hasMovement) {
+            // 立即停止步行动画（无论之前是否在行走）
+            walkingAnim.isWalking = false;
+            walkingAnim.walkCycle = 0;
+            walkingAnim.leftLegPhase = 0;
+            walkingAnim.rightLegPhase = 0;
+            
+            // 立即重置所有腿部关节到站立姿态（角度为0）
+            // 每帧都重置，确保即使有其他逻辑干扰也能恢复站立
+            const jointMap = (robotGroupRef.current as any).jointMap as Map<string, THREE.Group>;
+            if (jointMap) {
+              const leftHipPitch = jointMap.get('left_hip_pitch_joint');
+              const leftKnee = jointMap.get('left_knee_joint');
+              const leftAnklePitch = jointMap.get('left_ankle_pitch_joint');
+              const rightHipPitch = jointMap.get('right_hip_pitch_joint');
+              const rightKnee = jointMap.get('right_knee_joint');
+              const rightAnklePitch = jointMap.get('right_ankle_pitch_joint');
+              
+              // 强制重置所有腿部关节到站立姿态（角度为0）
+              // 每帧都执行，确保立即停止
+              if (leftHipPitch) URDFLoader.setJointAngle(leftHipPitch, 0);
+              if (leftKnee) URDFLoader.setJointAngle(leftKnee, 0);
+              if (leftAnklePitch) URDFLoader.setJointAngle(leftAnklePitch, 0);
+              if (rightHipPitch) URDFLoader.setJointAngle(rightHipPitch, 0);
+              if (rightKnee) URDFLoader.setJointAngle(rightKnee, 0);
+              if (rightAnklePitch) URDFLoader.setJointAngle(rightAnklePitch, 0);
+            }
+            // 跳过步行动画应用，直接渲染（不执行下面的hasMovement分支）
+          } else {
+            // 有移动输入，应用步行动画
             // 更新步行动画
+            // 前进时（linearX > 0）：walkCycle增加
+            // 后退时（linearX < 0）：walkCycle减少（反向）
             const walkSpeed = speed * 3; // 步行动画速度（根据速度大小调整动画速度）
-            walkingAnim.walkCycle += walkSpeed * deltaTime;
-            if (walkingAnim.walkCycle > 1) {
+            const direction = velocity.linearX >= 0 ? 1 : -1; // 前进为1，后退为-1
+            walkingAnim.walkCycle += walkSpeed * deltaTime * direction;
+            
+            // 保持walkCycle在[0, 1]范围内
+            if (walkingAnim.walkCycle >= 1) {
               walkingAnim.walkCycle -= 1;
             }
+            if (walkingAnim.walkCycle < 0) {
+              walkingAnim.walkCycle += 1;
+            }
             
-            // 左右腿相位差180度
+            // 左右腿相位差180度（始终保持）
+            // 确保右腿相位始终比左腿多0.5（180度）
             walkingAnim.leftLegPhase = walkingAnim.walkCycle;
-            walkingAnim.rightLegPhase = (walkingAnim.walkCycle + 0.5) % 1;
+            walkingAnim.rightLegPhase = walkingAnim.walkCycle + 0.5;
+            // 归一化到[0, 1)范围
+            if (walkingAnim.rightLegPhase >= 1) {
+              walkingAnim.rightLegPhase -= 1;
+            }
             
             // 应用步行动画到腿部关节
             const jointMap = (robotGroupRef.current as any).jointMap as Map<string, THREE.Group>;
@@ -381,28 +435,37 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
               const rightAnklePitch = jointMap.get('right_ankle_pitch_joint');
               
               // 计算步行时的关节角度（正弦波）
-              const legSwing = Math.sin(walkingAnim.leftLegPhase * Math.PI * 2) * 0.3; // 摆动幅度30度
-              const legLift = Math.max(0, Math.sin(walkingAnim.leftLegPhase * Math.PI * 2)) * 0.4; // 抬腿幅度40度
-              const kneeBend = Math.max(0, Math.sin(walkingAnim.leftLegPhase * Math.PI * 2)) * 0.5; // 膝盖弯曲50度
+              // 左腿相位：直接使用walkCycle
+              const leftPhase = walkingAnim.leftLegPhase * Math.PI * 2;
+              const legSwing = Math.sin(leftPhase) * 0.3; // 摆动幅度30度
+              const legLift = Math.max(0, Math.sin(leftPhase)) * 0.4; // 抬腿幅度40度
+              const kneeBend = Math.max(0, Math.sin(leftPhase)) * 0.5; // 膝盖弯曲50度
               
-              const rightLegSwing = Math.sin(walkingAnim.rightLegPhase * Math.PI * 2) * 0.3;
-              const rightLegLift = Math.max(0, Math.sin(walkingAnim.rightLegPhase * Math.PI * 2)) * 0.4;
-              const rightKneeBend = Math.max(0, Math.sin(walkingAnim.rightLegPhase * Math.PI * 2)) * 0.5;
+              // 右腿相位：比左腿多180度（0.5个周期），确保交替动作
+              const rightPhase = walkingAnim.rightLegPhase * Math.PI * 2;
+              const rightLegSwing = Math.sin(rightPhase) * 0.3;
+              const rightLegLift = Math.max(0, Math.sin(rightPhase)) * 0.4;
+              const rightKneeBend = Math.max(0, Math.sin(rightPhase)) * 0.5;
               
-              // 根据移动方向调整摆动
-              // linearX > 0 为前进，linearX < 0 为后退
-              const forwardFactor = velocity.linearX > 0 ? 1 : (velocity.linearX < 0 ? -1 : 0);
+              // 应用步行动画
+              // 注意：legSwing是前后摆动（可正可负），legLift是抬腿（只有正值）
+              // 左右腿相位差180度，所以当左腿抬起时（legLift > 0），右腿应该放下（rightLegLift = 0）
+              // 当左腿向前摆动时（legSwing > 0），右腿应该向后摆动（rightLegSwing < 0）
               
               // 如果有左右移动，调整摆动方向
               if (Math.abs(velocity.linearY) > 0.01) {
                 // 斜向移动时，摆动幅度减小
                 const sideFactor = velocity.linearY > 0 ? 0.7 : -0.7; // 右为正，左为负
-                if (leftHipPitch) URDFLoader.setJointAngle(leftHipPitch, legSwing * forwardFactor + legLift + sideFactor * 0.2);
-                if (rightHipPitch) URDFLoader.setJointAngle(rightHipPitch, rightLegSwing * forwardFactor + rightLegLift - sideFactor * 0.2);
+                // 左腿：前后摆动 + 抬腿 + 侧向调整
+                if (leftHipPitch) URDFLoader.setJointAngle(leftHipPitch, legSwing + legLift + sideFactor * 0.2);
+                // 右腿：前后摆动 + 抬腿 - 侧向调整（与左腿相反）
+                if (rightHipPitch) URDFLoader.setJointAngle(rightHipPitch, rightLegSwing + rightLegLift - sideFactor * 0.2);
               } else {
                 // 纯前后移动
-                if (leftHipPitch) URDFLoader.setJointAngle(leftHipPitch, legSwing * forwardFactor + legLift);
-                if (rightHipPitch) URDFLoader.setJointAngle(rightHipPitch, rightLegSwing * forwardFactor + rightLegLift);
+                // 左腿：前后摆动 + 抬腿
+                if (leftHipPitch) URDFLoader.setJointAngle(leftHipPitch, legSwing + legLift);
+                // 右腿：前后摆动 + 抬腿（相位差180度，自动交替）
+                if (rightHipPitch) URDFLoader.setJointAngle(rightHipPitch, rightLegSwing + rightLegLift);
               }
               
               if (leftKnee) URDFLoader.setJointAngle(leftKnee, -kneeBend);
@@ -413,32 +476,6 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
             }
             
             walkingAnim.isWalking = true;
-          } else {
-            // 没有移动输入，停止步行并立即重置姿态
-            if (walkingAnim.isWalking) {
-              walkingAnim.isWalking = false;
-              walkingAnim.walkCycle = 0;
-              walkingAnim.leftLegPhase = 0;
-              walkingAnim.rightLegPhase = 0;
-              
-              // 立即重置腿部姿态
-              const jointMap = (robotGroupRef.current as any).jointMap as Map<string, THREE.Group>;
-              if (jointMap) {
-                const leftHipPitch = jointMap.get('left_hip_pitch_joint');
-                const leftKnee = jointMap.get('left_knee_joint');
-                const leftAnklePitch = jointMap.get('left_ankle_pitch_joint');
-                const rightHipPitch = jointMap.get('right_hip_pitch_joint');
-                const rightKnee = jointMap.get('right_knee_joint');
-                const rightAnklePitch = jointMap.get('right_ankle_pitch_joint');
-                
-                if (leftHipPitch) URDFLoader.setJointAngle(leftHipPitch, 0);
-                if (leftKnee) URDFLoader.setJointAngle(leftKnee, 0);
-                if (leftAnklePitch) URDFLoader.setJointAngle(leftAnklePitch, 0);
-                if (rightHipPitch) URDFLoader.setJointAngle(rightHipPitch, 0);
-                if (rightKnee) URDFLoader.setJointAngle(rightKnee, 0);
-                if (rightAnklePitch) URDFLoader.setJointAngle(rightAnklePitch, 0);
-              }
-            }
           }
         }
 
@@ -507,29 +544,27 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
   
   // 新增：监听移动控制数据 - 直接从Zustand store获取（更可靠）
   useEffect(() => {
-    // 从store获取移动速度
-    const newVelocity = {
-      linearX: storeMoveVelocity.linearX || 0,
-      linearY: storeMoveVelocity.linearY || 0,
-      angularZ: storeMoveVelocity.angularZ || 0
-    };
+    // 从store获取移动速度（已经通过选择器分别订阅）
+    const velX = linearX || 0;
+    const velY = linearY || 0;
+    const velZ = angularZ || 0;
     
     // 计算是否有移动
-    const speed = Math.sqrt(newVelocity.linearX * newVelocity.linearX + newVelocity.linearY * newVelocity.linearY);
+    const speed = Math.sqrt(velX * velX + velY * velY);
     const hasMovement = speed > 0.01;
     
-    // 更新速度ref
-    moveVelocityRef.current = newVelocity;
+    // 更新速度ref（立即更新，确保动画循环能获取最新值）
+    moveVelocityRef.current = { linearX: velX, linearY: velY, angularZ: velZ };
     
     // 更新步行动画状态（立即更新，不等待动画循环）
-    if (!hasMovement && walkingAnimationRef.current.isWalking) {
-      // 立即停止步行动画并重置姿态
+    if (!hasMovement) {
+      // 没有移动输入，立即停止步行动画并重置姿态（无论之前是否在行走）
       walkingAnimationRef.current.isWalking = false;
       walkingAnimationRef.current.walkCycle = 0;
       walkingAnimationRef.current.leftLegPhase = 0;
       walkingAnimationRef.current.rightLegPhase = 0;
       
-      // 立即重置腿部姿态
+      // 立即重置所有腿部关节到站立姿态（角度为0）
       if (robotGroupRef.current) {
         const jointMap = (robotGroupRef.current as any).jointMap as Map<string, THREE.Group>;
         if (jointMap) {
@@ -540,6 +575,7 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           const rightKnee = jointMap.get('right_knee_joint');
           const rightAnklePitch = jointMap.get('right_ankle_pitch_joint');
           
+          // 强制重置所有腿部关节到站立姿态（角度为0）
           if (leftHipPitch) URDFLoader.setJointAngle(leftHipPitch, 0);
           if (leftKnee) URDFLoader.setJointAngle(leftKnee, 0);
           if (leftAnklePitch) URDFLoader.setJointAngle(leftAnklePitch, 0);
@@ -548,12 +584,22 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
           if (rightAnklePitch) URDFLoader.setJointAngle(rightAnklePitch, 0);
         }
       }
-      // 停止移动
-    } else if (hasMovement) {
+    } else {
+      // 有移动时，立即启动步行动画
       walkingAnimationRef.current.isWalking = true;
-      // 更新移动速度
+      
+      // 如果机器人模型已加载，立即应用一次初始动画状态（确保立即响应）
+      if (robotGroupRef.current) {
+        const jointMap = (robotGroupRef.current as any).jointMap as Map<string, THREE.Group>;
+        if (jointMap && walkingAnimationRef.current.walkCycle === 0) {
+          // 初始化一个小的walkCycle值，让动画立即开始
+          walkingAnimationRef.current.walkCycle = 0.01;
+          walkingAnimationRef.current.leftLegPhase = 0.01;
+          walkingAnimationRef.current.rightLegPhase = 0.51;
+        }
+      }
     }
-  }, [storeMoveVelocity]);
+  }, [linearX, linearY, angularZ]);
   
   // 辅助函数：根据关节名称设置关节角度
   const setJointAngle = (jointName: string, angle: number) => {
@@ -604,8 +650,7 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         break;
         
       case 'forward':
-      case 'Running':
-        // 前进：让机器人向前移动
+        // 前进：让机器人向前移动（仅按钮触发）
         if (robotGroupRef.current) {
           // 在当前朝向方向前进0.5个单位
           const direction = new THREE.Vector3(0, 0, -0.5);
@@ -615,13 +660,19 @@ export const Robot3DViewer: React.FC<Robot3DViewerProps> = ({
         break;
         
       case 'backward':
-        // 后退：让机器人向后移动
+        // 后退：让机器人向后移动（仅按钮触发）
         if (robotGroupRef.current) {
           // 在当前朝向方向后退0.5个单位
           const direction = new THREE.Vector3(0, 0, 0.5);
           direction.applyAxisAngle(new THREE.Vector3(0, 0, 1), robotGroupRef.current.rotation.z);
           robotGroupRef.current.position.add(direction);
         }
+        break;
+        
+      case 'Running':
+      case 'Walking':
+        // 摇杆触发的步行/跑步动画 - 不改变位置，只显示腿部动画
+        // 实际的腿部动画由动画循环中的 moveVelocityRef 控制
         break;
         
       case 'Wave':

@@ -119,10 +119,20 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           angularZ: angularZ
         });
         
+        // 立即发送移动控制命令到WebSocket（不节流，确保松开时立即停止）
+        // 这是关键：无论是否有输入，都要立即发送，确保Screen3能立即收到
+        const moveCommand = {
+          command: 'move',
+          linearX: linearX,
+          linearY: 0, // 不使用左右位移，只使用前后+转向
+          angularZ: angularZ,
+          timestamp: Date.now()
+        };
+        publishRef.current('robot_3d_move', moveCommand, 'std_msgs/String');
+        
         // 节流发送其他命令（避免过于频繁）
         if (now - lastSendTimeRef.current >= sendIntervalMs) {
           lastSendTimeRef.current = now;
-          
           
           // 根据线速度和角速度决定动画（与单屏模式一致）
           const totalSpeed = Math.sqrt(linearX * linearX + angularZ * angularZ);
@@ -147,21 +157,6 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
             // 广播到其他屏幕（用于多屏同步）
             publishRef.current('robot_3d_command', { command: targetAnimation, timestamp: Date.now() }, 'std_msgs/String');
           }
-          
-          // 发送实时移动控制命令（用于3D模型的足部动画）
-          // 注意：只使用linearX（前后）和angularZ（转向），不使用linearY（左右位移）
-          // 前进后退通过足部动画（Walking/Running）表示，不是位移
-          // 无论是否有输入，都要发送移动数据（包括停止命令）
-            const moveCommand = {
-              command: 'move',
-              linearX: linearX,
-              linearY: 0, // 不使用左右位移，只使用前后+转向
-              angularZ: angularZ,
-              timestamp: Date.now()
-            };
-          
-          // 发送到WebSocket（用于ROS2后端）
-          publishRef.current('robot_3d_move', moveCommand, 'std_msgs/String');
           
           // 同时通过setCommand触发更新（作为备用）
           if (hasInput) {
@@ -211,16 +206,16 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
         const timestamp = Date.now();
         
         if (buttonIndex === 0) {
-          command3D = 'RaiseRightArm';  // 按钮A - 右臂平举
+          command3D = 'Jump';  // 按钮A - 抬左腿
           setCommandRef.current(command3D + '_' + timestamp);
         } else if (buttonIndex === 1) {
-          command3D = 'ThumbsUp';  // 按钮B - 点赞
+          command3D = 'WalkJump';  // 按钮B - 抬右腿
           setCommandRef.current(command3D + '_' + timestamp);
         } else if (buttonIndex === 2) {
-          command3D = 'WalkJump';  // 按钮C - 跨栏
+          command3D = 'RaiseRightArm';  // 按钮C - 右臂平举
           setCommandRef.current(command3D + '_' + timestamp);
         } else if (buttonIndex === 3) {
-          command3D = 'Jump';  // 按钮D - 跳跃
+          command3D = 'ThumbsUp';  // 按钮D - 点赞
           setCommandRef.current(command3D + '_' + timestamp);
         } else if (buttonIndex === 4) {
           // LB按钮 - 左转（与web按钮一致）
@@ -282,13 +277,13 @@ export function PeripheralController({ enabled = true, onCommandSent, onManagerR
           let releaseCommand: string | null = null;
           
           if (buttonIndex === 0) {
-            releaseCommand = 'RaiseRightArm_release';  // 按钮A松开 - 重置右臂
+            releaseCommand = 'Jump_release';  // 按钮A松开 - 重置左腿
           } else if (buttonIndex === 1) {
-            releaseCommand = 'ThumbsUp_release';  // 按钮B松开 - 重置左手
+            releaseCommand = 'WalkJump_release';  // 按钮B松开 - 重置右腿
           } else if (buttonIndex === 2) {
-            releaseCommand = 'WalkJump_release';  // 按钮C松开 - 重置右腿
+            releaseCommand = 'RaiseRightArm_release';  // 按钮C松开 - 重置右臂
           } else if (buttonIndex === 3) {
-            releaseCommand = 'Jump_release';  // 按钮D松开 - 重置左腿
+            releaseCommand = 'ThumbsUp_release';  // 按钮D松开 - 重置左手
           } else if (buttonIndex === 6) {
             releaseCommand = 'TurnHead_release';  // 按钮6松开 - 重置头部（腰部）
           }

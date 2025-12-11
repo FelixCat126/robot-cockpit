@@ -198,11 +198,11 @@ export function createDefaultInputMapping(): InputMapper {
     },
   });
 
-  // ===== 按钮A：挥手 =====
+  // ===== 按钮A：抬左腿 =====
   mapper.addRule({
-    id: 'button-a-wave',
-    name: 'A按钮挥手',
-    description: '按下A按钮机器人挥手',
+    id: 'button-a-jump',
+    name: 'A按钮抬左腿',
+    description: '按下A按钮机器人抬左腿',
     trigger: {
       type: InputEventType.BUTTON_DOWN,
       buttonIndex: 0,
@@ -211,37 +211,19 @@ export function createDefaultInputMapping(): InputMapper {
       type: RobotCommandType.ACTION,
       topic: '/robot/action',
       messageType: 'std_msgs/String',
-      payload: { data: 'Wave' },
+      payload: { data: 'Jump' },
       priority: 8,
     },
   });
 
-  // ===== 按钮B：点赞 =====
+  // ===== 按钮B：抬右腿 =====
   mapper.addRule({
-    id: 'button-b-thumbs-up',
-    name: 'B按钮点赞',
-    description: '按下B按钮机器人点赞',
+    id: 'button-b-walk-jump',
+    name: 'B按钮抬右腿',
+    description: '按下B按钮机器人抬右腿',
     trigger: {
       type: InputEventType.BUTTON_DOWN,
       buttonIndex: 1,
-    },
-    command: {
-      type: RobotCommandType.ACTION,
-      topic: '/robot/action',
-      messageType: 'std_msgs/String',
-      payload: { data: 'ThumbsUp' },
-      priority: 8,
-    },
-  });
-  
-  // ===== 按钮C：跨栏 =====
-  mapper.addRule({
-    id: 'button-c-walk-jump',
-    name: 'C按钮跨栏',
-    description: '按下C按钮机器人跨栏',
-    trigger: {
-      type: InputEventType.BUTTON_DOWN,
-      buttonIndex: 2,
     },
     command: {
       type: RobotCommandType.ACTION,
@@ -252,11 +234,29 @@ export function createDefaultInputMapping(): InputMapper {
     },
   });
   
-  // ===== 按钮D：跳跃 =====
+  // ===== 按钮C：右臂平举 =====
   mapper.addRule({
-    id: 'button-d-jump',
-    name: 'D按钮跳跃',
-    description: '按下D按钮机器人跳跃',
+    id: 'button-c-raise-right-arm',
+    name: 'C按钮右臂平举',
+    description: '按下C按钮机器人右臂平举',
+    trigger: {
+      type: InputEventType.BUTTON_DOWN,
+      buttonIndex: 2,
+    },
+    command: {
+      type: RobotCommandType.ACTION,
+      topic: '/robot/action',
+      messageType: 'std_msgs/String',
+      payload: { data: 'RaiseRightArm' },
+      priority: 8,
+    },
+  });
+  
+  // ===== 按钮D：点赞 =====
+  mapper.addRule({
+    id: 'button-d-thumbs-up',
+    name: 'D按钮点赞',
+    description: '按下D按钮机器人点赞',
     trigger: {
       type: InputEventType.BUTTON_DOWN,
       buttonIndex: 3,
@@ -265,7 +265,7 @@ export function createDefaultInputMapping(): InputMapper {
       type: RobotCommandType.ACTION,
       topic: '/robot/action',
       messageType: 'std_msgs/String',
-      payload: { data: 'Jump' },
+      payload: { data: 'ThumbsUp' },
       priority: 8,
     },
   });

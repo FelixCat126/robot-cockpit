@@ -131,7 +131,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     draw();
   }, []); // 移除isPaused依赖，使用ref代替
 
-  // 主初始化 - 移除依赖,使用最新的函数引用
+  // 主初始化 - 优先摄像头，失败则模拟
   const initializeVideo = useCallback(async () => {
     // 开始初始化视频流
     setIsVideoLoading(true);
@@ -158,9 +158,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
     
     // 等待一小段时间确保资源完全释放
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    // 尝试初始化真实摄像头
+    // 先尝试真实摄像头，失败则回退模拟
+    let cameraFailed = false;
     try {
       console.log('[VideoPlayer] 请求摄像头访问...');
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -172,46 +173,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         audio: false,
       });
 
-      // 摄像头访问成功
       streamRef.current = stream;
     
       if (videoRef.current) {
-        // 设置video元素srcObject
         videoRef.current.srcObject = stream;
         
-        // 确保视频元素准备好
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           if (!videoRef.current) {
-            reject(new Error('videoRef丢失'));
+            resolve();
             return;
           }
           
           const video = videoRef.current;
-          
           const onLoadedMetadata = () => {
-            // 视频元数据加载完成
             video.removeEventListener('loadedmetadata', onLoadedMetadata);
             resolve();
           };
           
           video.addEventListener('loadedmetadata', onLoadedMetadata);
-          
-          // 超时保护
           setTimeout(() => {
             video.removeEventListener('loadedmetadata', onLoadedMetadata);
-            resolve(); // 即使超时也继续
-          }, 3000);
+            resolve();
+          }, 2000);
         });
         
-        // 开始播放视频
         await videoRef.current.play();
-        // 视频播放成功
       }
 
       const videoTrack = stream.getVideoTracks()[0];
       const settings = videoTrack.getSettings();
-      
-      // 摄像头设置完成
       
       setCameraInfo({
         width: settings.width || 1920,
@@ -223,83 +213,68 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setUseSimulation(false);
       setIsVideoLoading(false);
       setVideoError(null);
-      // 真实摄像头初始化完成
+      console.log('[VideoPlayer] 真实摄像头初始化成功');
+      return; // 成功则结束
     } catch (error: any) {
-      console.error('[VideoPlayer] 摄像头初始化失败,切换到模拟视频:', error);
-      console.error('[VideoPlayer] 错误详情:', error?.message, error?.name);
-
-  // 初始化模拟视频
-      try {
-        // 开始初始化模拟视频
-    const canvas = canvasRef.current;
-    if (!canvas) {
-          throw new Error('canvas元素未找到');
+      cameraFailed = true;
+      console.warn('[VideoPlayer] 摄像头初始化失败，切换模拟视频:', error?.message || error);
     }
+
+    // 摄像头失败，使用模拟视频
+      try {
+    const canvas = canvasRef.current;
+      if (!canvas) throw new Error('canvas元素未找到');
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-          throw new Error('无法获取canvas 2d context');
-    }
+      if (!ctx) throw new Error('无法获取canvas 2d context');
 
-    // 设置canvas尺寸
     canvas.width = 1920;
     canvas.height = 1080;
-
-    // 先绘制一帧，确保canvas有内容
     drawSimulatedVideo(ctx, canvas.width, canvas.height);
 
-    // 创建视频流（30fps）
     const stream = canvas.captureStream(30);
     streamRef.current = stream;
-        // 模拟视频流创建成功
 
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
       
-      // 等待视频元数据加载
-      await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
         if (!videoRef.current) {
-          reject(new Error('videoRef丢失'));
+            resolve();
           return;
         }
         
         const video = videoRef.current;
-        
         const onLoadedMetadata = () => {
           video.removeEventListener('loadedmetadata', onLoadedMetadata);
           resolve();
         };
         
         video.addEventListener('loadedmetadata', onLoadedMetadata);
-        
-        // 超时保护
         setTimeout(() => {
           video.removeEventListener('loadedmetadata', onLoadedMetadata);
-          resolve(); // 即使超时也继续
-        }, 3000);
+            resolve();
+          }, 2000);
       });
       
-      // 开始播放视频
       await videoRef.current.play();
-          // 模拟视频播放成功
     }
 
     setCameraInfo({
       width: 1920,
       height: 1080,
       fps: 30,
-      deviceLabel: '模拟机器人视角',
+        deviceLabel: cameraFailed ? '模拟机器人视角(权限失败)' : '模拟机器人视角',
     });
 
     setUseSimulation(true);
     setIsVideoLoading(false);
     setVideoError(null);
-        // 模拟视频初始化完成
-      } catch (simError: any) {
-        console.error('[VideoPlayer] 模拟视频初始化也失败:', simError);
-        setVideoError(`视频初始化失败: ${simError?.message || '未知错误'}`);
+      console.log('[VideoPlayer] 模拟视频初始化成功');
+    } catch (error: any) {
+      console.error('[VideoPlayer] 模拟视频初始化也失败:', error);
+      setVideoError(`视频初始化失败: ${error?.message || '未知错误'}`);
         setIsVideoLoading(false);
-      }
     }
   }, [drawSimulatedVideo]);
 
@@ -385,20 +360,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            display: isVideoLoading || videoError || !isVideoEnabled ? 'none' : 'block',
-            backgroundColor: '#000' // 确保背景是黑色，避免显示空白
+            display: (!isVideoEnabled || videoError) ? 'none' : 'block',
+            backgroundColor: '#000', // 确保背景是黑色，避免显示空白
+            visibility: isVideoLoading ? 'hidden' : 'visible' // 加载时隐藏但保持空间
           }}
         />
         <canvas 
           ref={canvasRef} 
           style={{ 
-            display: useSimulation ? 'block' : 'none',
+            display: 'none', // canvas 仅用于生成视频流，不直接显示
             position: 'absolute',
             top: 0,
             left: 0,
             width: '1px',
             height: '1px',
-            opacity: 0,
             pointerEvents: 'none',
             zIndex: -1
           }}

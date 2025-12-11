@@ -52,7 +52,7 @@ function Screen1({ screenId }: Screen1Props) {
 
         {/* 音频可视化区域 */}
         <div className="audio-panel-multi">
-          <AudioPlayer screenId={screenId} />
+          <AudioPlayer compact={true} screenId={screenId} enableMicrophone={true} />
         </div>
       </div>
     </div>

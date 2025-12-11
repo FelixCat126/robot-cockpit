@@ -7,8 +7,6 @@ import { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { getIcon } from '../ControlIcons';
 import { useRobot3DStore } from '../../stores/robot3DStore';
-import { PeripheralController } from './PeripheralController';
-import { RobotCommand } from '../../types/peripheral.types';
 import './CompactStyles.css';
 
 interface ControlPanelProps {
@@ -26,7 +24,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   compact = false,
   className = '',
   onRobotControl,
-  enablePeripherals = false,
+  enablePeripherals: _enablePeripherals = false, // 前缀下划线表示有意未使用
   connected: externalConnected,
   publish: externalPublish,
 }) => {
@@ -84,41 +82,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     // 更新选中命令显示
     setSelectedCommand(commandId);
   };
-  
-
-  // 处理外设命令
-  const handlePeripheralCommand = (cmd: RobotCommand) => {
-    
-    // 更新选中命令显示
-    if (cmd.type === 'velocity') {
-      setSelectedCommand('external_control');
-    } else if (cmd.type === 'action') {
-      // 提取命令ID，用于高亮对应的web按钮
-      const commandId = cmd.payload?.data || 'external_action';
-      setSelectedCommand(commandId);
-      
-      // 同时发送命令（确保与web按钮行为一致）
-      if (connected && publish) {
-        publish('/robot/commands', {
-          type: commandId,
-          timestamp: new Date().toISOString(),
-          screenId: screenId,
-        });
-      }
-    }
-  };
 
   return (
     <div className={`control-panel ${compact ? 'compact' : ''} ${className}`}>
-      {/* 外设控制器（隐藏组件，仅处理逻辑） */}
-      {enablePeripherals && (
-        <PeripheralController 
-          enabled={enablePeripherals} 
-          onCommandSent={handlePeripheralCommand}
-          onManagerReady={() => {}}
-        />
-      )}
-
+      {/* 注意：PeripheralController 已移至 Screen0 顶层，无需在此渲染 */}
 
       <div className="control-content">
         {commandCategories.map((category) => (

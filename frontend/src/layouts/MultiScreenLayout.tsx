@@ -26,6 +26,38 @@ export const MultiScreenLayout: React.FC = () => {
   });
   const { isAuthenticated, checkAuth } = useAuthStore();
   const checkAuthRef = useRef(checkAuth);
+  const lastRobotIdRef = useRef<string | null>(selectedRobotId);
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
+  
+  // 统一的 BroadcastChannel 初始化函数
+  const initBroadcastChannel = () => {
+    if (broadcastRef.current) {
+      return broadcastRef.current;
+    }
+    
+    if (typeof BroadcastChannel === 'undefined') {
+      return null;
+    }
+    
+    const channel = new BroadcastChannel('robot_cockpit');
+    broadcastRef.current = channel;
+    
+    channel.onmessage = (event) => {
+      const msg = event.data;
+      if (!msg || !msg.type) return;
+      if (msg.type === 'robot_selected') {
+        lastRobotIdRef.current = msg.robotId || null;
+        setSelectedRobotId(msg.robotId || null);
+      }
+      if (msg.type === 'robot_deselected') {
+        lastRobotIdRef.current = null;
+        setSelectedRobotId(null);
+        localStorage.removeItem('robot_cockpit_selected_robot');
+      }
+    };
+    
+    return channel;
+  };
   
   checkAuthRef.current = checkAuth;
 
@@ -38,6 +70,9 @@ export const MultiScreenLayout: React.FC = () => {
     }
 
     checkAuthRef.current();
+    
+    // 立即初始化 BroadcastChannel（在第一个 useEffect 中，确保尽早初始化）
+    initBroadcastChannel();
   }, []);
 
   useEffect(() => {
@@ -78,6 +113,10 @@ export const MultiScreenLayout: React.FC = () => {
         const saved = localStorage.getItem('robot_cockpit_selected_robot');
         setSelectedRobotId(saved || null);
       }
+      if (e.key === 'robot_cockpit_robot_deselected') {
+        setSelectedRobotId(null);
+        localStorage.removeItem('robot_cockpit_selected_robot');
+      }
     };
     
     window.addEventListener('storage', handleStorageChange);
@@ -89,11 +128,24 @@ export const MultiScreenLayout: React.FC = () => {
     
     const handleRobotUpdate = () => {
       const saved = localStorage.getItem('robot_cockpit_selected_robot');
-      setSelectedRobotId(saved || null);
+      if (!saved) {
+        setSelectedRobotId(null);
+      } else {
+        setSelectedRobotId(saved);
+      }
     };
     
     window.addEventListener('robot_cockpit_auth_update', handleAuthUpdate);
     window.addEventListener('robot_cockpit_robot_update', handleRobotUpdate);
+    
+    // 强制轮询检查机器人选择状态（每500ms检查一次）
+    const pollInterval = setInterval(() => {
+      const currentRobotId = localStorage.getItem('robot_cockpit_selected_robot');
+      if (currentRobotId !== lastRobotIdRef.current) {
+        lastRobotIdRef.current = currentRobotId;
+        setSelectedRobotId(currentRobotId);
+      }
+    }, 500);
     
     const handleRobotSelected = (data: { robotId: string; timestamp: number }) => {
       setSelectedRobotId(() => data.robotId);
@@ -119,11 +171,10 @@ export const MultiScreenLayout: React.FC = () => {
     };
 
     const handleRobotDeselected = () => {
-      console.log('[MultiScreenLayout] Robot deselected, clearing state for screen:', screenId);
       setSelectedRobotId(null);
+      lastRobotIdRef.current = null;
       localStorage.removeItem('robot_cockpit_selected_robot');
-      localStorage.removeItem('robot_cockpit_robot_updated');
-      // 触发自定义事件，通知同窗口内的其他组件
+      localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
       window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
     };
 
@@ -131,7 +182,10 @@ export const MultiScreenLayout: React.FC = () => {
     websocketService.on('user_logged_out', handleUserLoggedOut);
     websocketService.on('robot_deselected', handleRobotDeselected);
 
+    initBroadcastChannel();
+
     return () => {
+      clearInterval(pollInterval);
       websocketService.off('connected', handleConnected);
       websocketService.off('auth_status_change', handleAuthStatusChange);
       window.removeEventListener('storage', handleStorageChange);
@@ -140,14 +194,26 @@ export const MultiScreenLayout: React.FC = () => {
       websocketService.off('robot_selected', handleRobotSelected);
       websocketService.off('user_logged_out', handleUserLoggedOut);
       websocketService.off('robot_deselected', handleRobotDeselected);
+      if (broadcastRef.current) {
+        broadcastRef.current.close();
+        broadcastRef.current = null;
+      }
     };
   }, [screenId]);
 
   const handleSelectRobot = async (robotId: string) => {
     try {
+      // 确保 BroadcastChannel 已初始化
+      const channel = initBroadcastChannel();
+      
       setSelectedRobotId(robotId);
+      lastRobotIdRef.current = robotId;
       localStorage.setItem('robot_cockpit_selected_robot', robotId);
       localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
+      
+      if (channel) {
+        channel.postMessage({ type: 'robot_selected', robotId });
+      }
       
       // 使用通信工厂连接到机器人（自动选择 WebSocket 或 WebRTC）
       // TODO: 临时跳过实际连接，待远端机器人就绪后正常连接
@@ -168,23 +234,16 @@ export const MultiScreenLayout: React.FC = () => {
   };
 
   const handleDeselectRobot = () => {
-    console.log('[MultiScreenLayout] Deselecting robot from screen:', screenId);
-    
-    // 断开当前机器人连接
+    if (websocketService.getStatus().connected) {
+      websocketService.deselectRobot();
+    } else {
+      setSelectedRobotId(null);
+      lastRobotIdRef.current = null;
+      localStorage.removeItem('robot_cockpit_selected_robot');
+      localStorage.setItem('robot_cockpit_robot_updated', Date.now().toString());
+      window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
+    }
     communicationFactory.disconnectRobot();
-    
-    // 先更新本地状态
-    setSelectedRobotId(null);
-    localStorage.removeItem('robot_cockpit_selected_robot');
-    localStorage.removeItem('robot_cockpit_robot_updated');
-    
-    // 发送取消选择事件到后端（会广播到所有屏幕）
-    websocketService.deselectRobot();
-    
-    // 触发自定义事件，通知同窗口内的其他组件（备用机制）
-    window.dispatchEvent(new CustomEvent('robot_cockpit_robot_update'));
-    
-    console.log('[MultiScreenLayout] Robot deselected, state cleared');
   };
 
   const renderScreen = () => {
